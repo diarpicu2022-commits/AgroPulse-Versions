@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit;
 
 public class GitHubModelsService implements AIService {
 
-    private static final String API_URL = "https://models.azure.com/v1/chat/completions";
-    private static final String MODEL = "phi-4-mini";
+    private static final String API_URL = "https://models.github.ai/inference/chat/completions";
+    private static final String MODEL = "openai/gpt-4o-mini";
 
     private final String apiKey;
     private final OkHttpClient httpClient;
@@ -58,10 +58,10 @@ public class GitHubModelsService implements AIService {
     }
 
     @Override
-    public boolean isAvailable() { return false; } // Temporalmente desactivado - API en transición
+    public boolean isAvailable() { return enabled; }
 
     @Override
-    public String getProviderName() { return "GitHub Models (phi-4-mini)"; }
+    public String getProviderName() { return "GitHub Models (gpt-4o-mini)"; }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled && !apiKey.isBlank();
@@ -102,6 +102,8 @@ public class GitHubModelsService implements AIService {
             Request request = new Request.Builder()
                     .url(API_URL)
                     .header("Authorization", "Bearer " + apiKey)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
                     .header("Content-Type", "application/json")
                     .post(requestBody)
                     .build();
