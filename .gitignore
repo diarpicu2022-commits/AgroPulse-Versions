@@ -1,0 +1,27 @@
+# AgroPulse - Git Ignore
+
+# Java/Maven
+target/
+bin/
+*.class
+*.jar
+*.war
+
+# IDE
+.vscode/
+.settings/
+.classpath
+.project
+
+# Base de datos
+*.db
+
+# Variables de entorno (NUNCA subir a GitHub)
+.env
+
+# Docker
+Dockerfile
+
+# OS
+.DS_Store
+Thumbs.db
