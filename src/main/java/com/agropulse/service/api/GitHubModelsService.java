@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit;
 
 public class GitHubModelsService implements AIService {
 
-    private static final String API_URL = "https://api.github.com/models/v1/chat/completions";
-    private static final String MODEL = "anthropic/claude-sonnet-4-20250514";
+    private static final String API_URL = "https://models.azure.com/v1/chat/completions";
+    private static final String MODEL = "phi-4-mini";
 
     private final String apiKey;
     private final OkHttpClient httpClient;
@@ -28,13 +28,6 @@ public class GitHubModelsService implements AIService {
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
-                .addInterceptor(chain -> {
-                    Request original = chain.request();
-                    Request newRequest = original.newBuilder()
-                            .header("Accept", "application/json")
-                            .build();
-                    return chain.proceed(newRequest);
-                })
                 .build();
     }
 
@@ -65,7 +58,7 @@ public class GitHubModelsService implements AIService {
     }
 
     @Override
-    public boolean isAvailable() { return enabled; }
+    public boolean isAvailable() { return false; } // Temporalmente desactivado - API en transición
 
     @Override
     public String getProviderName() { return "GitHub Models (phi-4-mini)"; }
