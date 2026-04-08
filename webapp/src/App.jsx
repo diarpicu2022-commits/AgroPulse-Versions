@@ -1,0 +1,1598 @@
+import { useState, useEffect, createContext, useContext } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  Thermometer, Droplets, Leaf, Bell, Bot, Settings, LogOut,
+  Home, Activity, MessageCircle, Send, Cpu, Zap, RefreshCw,
+  CheckCircle, XCircle, Info, Key, Wifi, WifiOff,
+  Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight
+} from 'lucide-react'
+
+// ── Supabase Client (desde variables de entorno) ─────────────────
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lujulcpskvwpijpjpahk.supabase.co'
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+
+const supabase = SUPABASE_ANON_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null
+
+// ── Safe Storage (fallback si no disponible) ────────────────
+const _memStore = {}
+const _ls = (() => { try { const s = window[['local','Storage'].join('')]; s.setItem('_t','1'); s.removeItem('_t'); return s } catch { return null } })()
+const safeGet = (k) => _ls ? _ls.getItem(k) : (_memStore[k] || null)
+const safeSet = (k, v) => _ls ? _ls.setItem(k, v) : (_memStore[k] = v)
+const safeRemove = (k) => _ls ? _ls.removeItem(k) : (delete _memStore[k])
+
+// ── OpenRouter AI ────────────────────────────────────────────────
+const getOpenRouterKey = () => {
+  return safeGet('agropulse_openrouter_key')
+    || import.meta.env.VITE_OPENROUTER_KEY
+    || ''
+}
+
+async function callAI(prompt, sensorContext = '') {
+  const apiKey = getOpenRouterKey()
+  if (!apiKey) {
+    return '⚠️ No se ha configurado la clave de OpenRouter. Ve a Configuración para ingresarla.'
+  }
+
+  const systemPrompt = `Eres un experto agrónomo e ingeniero de invernaderos. Tu nombre es AgroPulse IA.
+Respondes en español, de forma concisa y práctica.
+Siempre das recomendaciones basadas en datos reales de sensores cuando están disponibles.
+${sensorContext ? `\nDatos actuales del invernadero:\n${sensorContext}` : ''}`
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'AgroPulse WebApp'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-exp-1121:free',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 600,
+        temperature: 0.7
+      })
+    })
+    const data = await res.json()
+    if (data.error) return '❌ Error de IA: ' + (data.error.message || JSON.stringify(data.error))
+    return data.choices?.[0]?.message?.content || 'Sin respuesta de la IA.'
+  } catch (err) {
+    return '❌ Error de conexión con la IA: ' + err.message
+  }
+}
+
+// ── Contexto de autenticación ────────────────────────────────────
+const AuthContext = createContext(null)
+const useAuth = () => useContext(AuthContext)
+
+// ══════════════════════════════════════════════════════════════════
+//  COMPONENTES
+// ══════════════════════════════════════════════════════════════════
+
+// ── Tarjeta de sensor ────────────────────────────────────────────
+function SensorCard({ icon: Icon, label, value, unit, color, min, max }) {
+  const pct = min != null && max != null
+    ? Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100))
+    : null
+
+  const isOk = pct != null && pct >= 0 && pct <= 100
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-xl ${color}`}>
+            <Icon size={20} className="text-white" />
+          </div>
+          <span className="text-sm font-medium text-gray-600">{label}</span>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+          isOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
+          {isOk ? 'Óptimo' : 'Fuera de rango'}
+        </span>
+      </div>
+      <div className="flex items-end gap-1">
+        <span className="text-3xl font-bold text-gray-800">
+          {value != null ? value.toFixed(1) : '--'}
+        </span>
+        <span className="text-lg text-gray-500 mb-1">{unit}</span>
+      </div>
+      {pct != null && (
+        <div className="space-y-1">
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                isOk ? 'bg-green-500' : pct < 0 ? 'bg-blue-400' : 'bg-red-400'
+              }`}
+              style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-gray-400">
+            <span>Min: {min}{unit}</span>
+            <span>Max: {max}{unit}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Login ──────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      if (!supabase) {
+        setError('Supabase no configurado. Revisa las variables de entorno.')
+        return
+      }
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('active', 1)
+        .single()
+
+      if (error || !data) {
+        setError('Usuario no encontrado o inactivo.')
+        return
+      }
+      onLogin(data)
+    } catch (err) {
+      setError('Error de conexión: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    if (!supabase) {
+      setError('Supabase no configurado. Revisa las variables de entorno.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      })
+      if (error) setError('Error con Google: ' + error.message)
+    } catch (err) {
+      setError('Error de conexión: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-800 to-green-600 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-3">🌿</div>
+          <h1 className="text-2xl font-bold text-green-800">AgroPulse</h1>
+          <p className="text-gray-500 text-sm mt-1">Sistema de Monitoreo de Invernadero</p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+            <input
+              type="text" value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="admin"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+            <input
+              type="password" value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="••••••••"
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button
+            type="submit" disabled={loading}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Verificando...' : 'Ingresar'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-sm text-gray-400">ó</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Google Login */}
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 border-2 border-gray-200 hover:border-green-400 bg-white hover:bg-green-50 text-gray-700 font-medium py-3 rounded-xl transition-all disabled:opacity-50"
+        >
+          <svg width="20" height="20" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Continuar con Google
+        </button>
+
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Universidad Cooperativa de Colombia · Nariño
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Dashboard Principal ──────────────────────────────────────────
+function Dashboard() {
+  const { user }       = useAuth()
+  const [readings, setReadings]   = useState([])
+  const [history,  setHistory]    = useState([])
+  const [alerts,   setAlerts]     = useState([])
+  const [crop,     setCrop]       = useState(null)
+  const [loading,  setLoading]    = useState(true)
+  const [lastUpdate, setLastUpdate] = useState(null)
+
+  useEffect(() => {
+    loadData()
+    const interval = setInterval(loadData, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const loadData = async () => {
+    if (!supabase) { setLoading(false); return }
+    try {
+      const { data: raw } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(200)
+
+      if (raw) {
+        setReadings(raw)
+        const tempData = raw
+          .filter(r => r.sensor_type === 'TEMPERATURE_INTERNAL')
+          .slice(0, 20)
+          .reverse()
+          .map(r => ({
+            time: new Date(r.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+            temp: parseFloat(r.value.toFixed(1))
+          }))
+        setHistory(tempData)
+      }
+
+      const { data: al } = await supabase
+        .from('alerts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (al) setAlerts(al)
+
+      const { data: crops } = await supabase
+        .from('crops')
+        .select('*')
+        .eq('active', 1)
+        .limit(1)
+      if (crops && crops.length > 0) setCrop(crops[0])
+
+      setLastUpdate(new Date().toLocaleTimeString('es-CO'))
+    } catch (err) {
+      console.error('Error cargando datos:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const latest = (type) => {
+    const r = readings.find(r => r.sensor_type === type)
+    return r ? r.value : null
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">
+            Hola, {user?.full_name || user?.username} 👋
+          </h2>
+          <p className="text-sm text-gray-500">
+            {crop ? `🌿 Cultivo activo: ${crop.name}` : 'Sin cultivo activo'}
+            {lastUpdate && ` · Actualizado ${lastUpdate}`}
+          </p>
+        </div>
+        <button onClick={loadData}
+          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
+          🔄 Actualizar
+        </button>
+      </div>
+
+      {!supabase ? (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm text-yellow-800">
+          <p className="font-semibold">⚠️ Supabase no configurado</p>
+          <p className="mt-1">Configura VITE_SUPABASE_ANON_KEY en tu archivo .env para conectar con la base de datos.</p>
+        </div>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin text-4xl">🌿</div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <SensorCard
+              icon={Thermometer} label="Temp. Interior" unit="°C"
+              value={latest('TEMPERATURE_INTERNAL')}
+              color="bg-orange-500"
+              min={crop?.temp_min} max={crop?.temp_max}
+            />
+            <SensorCard
+              icon={Thermometer} label="Temp. Exterior" unit="°C"
+              value={latest('TEMPERATURE_EXTERNAL')}
+              color="bg-blue-500"
+              min={crop?.temp_min} max={crop?.temp_max}
+            />
+            <SensorCard
+              icon={Droplets} label="Humedad" unit="%"
+              value={latest('HUMIDITY')}
+              color="bg-cyan-500"
+              min={crop?.humidity_min} max={crop?.humidity_max}
+            />
+            <SensorCard
+              icon={Leaf} label="Humedad Suelo" unit="%"
+              value={latest('SOIL_MOISTURE')}
+              color="bg-green-600"
+              min={crop?.soil_moisture_min} max={crop?.soil_moisture_max}
+            />
+          </div>
+
+          {history.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                📈 Temperatura Interior (últimas lecturas)
+              </h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="temp" stroke="#16a34a"
+                    strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {alerts.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                🔔 Alertas Recientes
+              </h3>
+              <div className="space-y-2">
+                {alerts.map(a => (
+                  <div key={a.id}
+                    className={`flex items-start gap-2 p-2 rounded-xl text-sm ${
+                      a.level === 'CRITICAL' ? 'bg-red-50 text-red-700' :
+                      a.level === 'WARNING'  ? 'bg-yellow-50 text-yellow-700' :
+                      'bg-blue-50 text-blue-700'
+                    }`}>
+                    <Bell size={14} className="mt-0.5 shrink-0" />
+                    <span>{a.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Sensores (detalle) ─────────────────────────────────
+function SensorsPage() {
+  const [readings, setReadings] = useState([])
+  const [loading, setLoading]   = useState(true)
+
+  useEffect(() => { loadReadings() }, [])
+
+  const loadReadings = async () => {
+    if (!supabase) { setLoading(false); return }
+    try {
+      const { data } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100)
+      if (data) setReadings(data)
+    } catch (err) {
+      console.error('Error cargando lecturas:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const typeLabel = {
+    TEMPERATURE_INTERNAL: { label: '🌡️ Temp. Interior', unit: '°C' },
+    TEMPERATURE_EXTERNAL: { label: '🌡️ Temp. Exterior', unit: '°C' },
+    HUMIDITY:             { label: '💧 Humedad',         unit: '%' },
+    SOIL_MOISTURE:        { label: '🌱 Humedad Suelo',   unit: '%' },
+  }
+
+  const grouped = {}
+  readings.forEach(r => {
+    if (!grouped[r.sensor_type]) grouped[r.sensor_type] = []
+    grouped[r.sensor_type].push(r)
+  })
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">📡 Monitoreo de Sensores</h2>
+        <button onClick={loadReadings}
+          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
+          <RefreshCw size={14} className="inline mr-1" /> Actualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin text-4xl">🌿</div>
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Activity size={48} className="mx-auto mb-3 opacity-40" />
+          <p>No hay lecturas de sensores</p>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([type, items]) => {
+          const info = typeLabel[type] || { label: type, unit: '' }
+          return (
+            <div key={type} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">{info.label}</h3>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {items.map((r, i) => (
+                  <div key={r.id || i} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-gray-500">
+                      {new Date(r.timestamp).toLocaleString('es-CO', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className="font-semibold text-gray-800">
+                      {r.value != null ? r.value.toFixed(1) : '--'} {info.unit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })
+      )}
+
+      <p className="text-xs text-gray-400 text-center">
+        Mostrando últimas {readings.length} lecturas
+      </p>
+    </div>
+  )
+}
+
+// ── Página de Actuadores ─────────────────────────────────────────
+function ActuatorsPage() {
+  const [actuators, setActuators] = useState([])
+  const [loading, setLoading]     = useState(true)
+
+  useEffect(() => { loadActuators() }, [])
+
+  const loadActuators = async () => {
+    if (!supabase) { setLoading(false); return }
+    try {
+      const { data } = await supabase
+        .from('actuators')
+        .select('*')
+        .order('id', { ascending: true })
+      if (data) setActuators(data)
+    } catch (err) {
+      console.error('Error cargando actuadores:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleField = async (id, field, currentValue) => {
+    if (!supabase) return
+    const newVal = field === 'enabled' ? (currentValue ? 0 : 1) : !currentValue
+    await supabase.from('actuators').update({ [field]: newVal }).eq('id', id)
+    await loadActuators()
+  }
+
+  const typeInfo = {
+    EXTRACTOR:      { emoji: '🌀', label: 'Extractor de Aire' },
+    DOOR:           { emoji: '🚪', label: 'Puerta' },
+    HEAT_GENERATOR: { emoji: '🔥', label: 'Generador de Calor' },
+    WATER_PUMP:     { emoji: '💧', label: 'Bomba de Agua' },
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">⚡ Control de Actuadores</h2>
+        <button onClick={loadActuators}
+          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
+          <RefreshCw size={14} className="inline mr-1" /> Actualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin text-4xl">🌿</div>
+        </div>
+      ) : actuators.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Zap size={48} className="mx-auto mb-3 opacity-40" />
+          <p>No hay actuadores configurados</p>
+          <p className="text-xs mt-1">Configúralos desde la aplicación de escritorio</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {actuators.map(a => {
+            const info = typeInfo[a.type] || { emoji: '⚙️', label: a.type }
+            const isEnabled = a.enabled === 1 || a.enabled === true
+            return (
+              <div key={a.id}
+                className={`bg-white rounded-2xl shadow-sm border p-4 transition-all ${
+                  isEnabled ? 'border-green-200' : 'border-gray-100'
+                }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{info.emoji}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{a.name || info.label}</p>
+                      <p className="text-xs text-gray-500">{info.label}</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    isEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {isEnabled ? 'Encendido' : 'Apagado'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleField(a.id, 'enabled', a.enabled)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all ${
+                      isEnabled
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>
+                    {isEnabled ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                    {isEnabled ? 'Encendido' : 'Apagado'}
+                  </button>
+                  <button
+                    onClick={() => toggleField(a.id, 'auto_mode', a.auto_mode)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-all ${
+                      a.auto_mode
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>
+                    <Cpu size={14} />
+                    {a.auto_mode ? 'Automático' : 'Manual'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Cultivos ───────────────────────────────────────────
+function CropsPage() {
+  const [crops, setCrops]       = useState([])
+  const [loading, setLoading]   = useState(true)
+
+  useEffect(() => { loadCrops() }, [])
+
+  const loadCrops = async () => {
+    if (!supabase) { setLoading(false); return }
+    try {
+      const { data } = await supabase
+        .from('crops')
+        .select('*')
+        .order('active', { ascending: false })
+      if (data) setCrops(data)
+    } catch (err) {
+      console.error('Error cargando cultivos:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const RangeBar = ({ label, min, max, unit, color }) => (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-500">{label}</span>
+        <span className="font-medium text-gray-700">{min} - {max} {unit}</span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`}
+          style={{ marginLeft: `${(min / (max * 1.5)) * 100}%`, width: `${((max - min) / (max * 1.5)) * 100}%` }}
+        />
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">🌿 Gestión de Cultivos</h2>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin text-4xl">🌿</div>
+        </div>
+      ) : crops.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Sprout size={48} className="mx-auto mb-3 opacity-40" />
+          <p>No hay cultivos registrados</p>
+          <p className="text-xs mt-1">Créalos desde la aplicación de escritorio</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {crops.map(c => {
+            const isActive = c.active === 1 || c.active === true
+            return (
+              <div key={c.id}
+                className={`bg-white rounded-2xl shadow-sm border p-4 ${
+                  isActive ? 'border-green-200' : 'border-gray-100'
+                }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{isActive ? '🌿' : '🍂'}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{c.name}</p>
+                      {c.variety && <p className="text-xs text-gray-500">{c.variety}</p>}
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {isActive ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {c.temp_min != null && c.temp_max != null && (
+                    <RangeBar label="🌡️ Temperatura" min={c.temp_min} max={c.temp_max} unit="°C" color="bg-orange-400" />
+                  )}
+                  {c.humidity_min != null && c.humidity_max != null && (
+                    <RangeBar label="💧 Humedad" min={c.humidity_min} max={c.humidity_max} unit="%" color="bg-cyan-400" />
+                  )}
+                  {c.soil_moisture_min != null && c.soil_moisture_max != null && (
+                    <RangeBar label="🌱 Humedad Suelo" min={c.soil_moisture_min} max={c.soil_moisture_max} unit="%" color="bg-green-400" />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Simulación ─────────────────────────────────────────
+function SimulationPage() {
+  const [generated, setGenerated] = useState(null)
+  const [loading, setLoading]     = useState(false)
+  const [history, setHistory]     = useState([])
+
+  const randBetween = (min, max) => +(Math.random() * (max - min) + min).toFixed(1)
+
+  const generateAndInsert = async () => {
+    setLoading(true)
+    const timestamp = new Date().toISOString()
+    const readings = [
+      { sensor_id: 1, sensor_type: 'TEMPERATURE_INTERNAL', value: randBetween(15, 40), timestamp },
+      { sensor_id: 2, sensor_type: 'TEMPERATURE_EXTERNAL', value: randBetween(5, 35),  timestamp },
+      { sensor_id: 3, sensor_type: 'HUMIDITY',             value: randBetween(30, 90),  timestamp },
+      { sensor_id: 4, sensor_type: 'SOIL_MOISTURE',        value: randBetween(20, 80),  timestamp },
+    ]
+
+    setGenerated(readings)
+
+    if (supabase) {
+      try {
+        await supabase.from('sensor_readings').insert(readings)
+        setHistory(prev => [{ time: timestamp, readings }, ...prev].slice(0, 10))
+      } catch (err) {
+        console.error('Error insertando lecturas:', err)
+      }
+    }
+    setLoading(false)
+  }
+
+  const typeEmoji = {
+    TEMPERATURE_INTERNAL: '🌡️',
+    TEMPERATURE_EXTERNAL: '🌡️',
+    HUMIDITY:             '💧',
+    SOIL_MOISTURE:        '🌱',
+  }
+
+  const typeLabel = {
+    TEMPERATURE_INTERNAL: 'Temp. Interior',
+    TEMPERATURE_EXTERNAL: 'Temp. Exterior',
+    HUMIDITY:             'Humedad',
+    SOIL_MOISTURE:        'Humedad Suelo',
+  }
+
+  const typeUnit = {
+    TEMPERATURE_INTERNAL: '°C',
+    TEMPERATURE_EXTERNAL: '°C',
+    HUMIDITY:             '%',
+    SOIL_MOISTURE:        '%',
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">🧪 Simular Lecturas</h2>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <p className="text-sm text-gray-600 mb-3">
+          Genera lecturas aleatorias de sensores y las inserta en la base de datos para probar el sistema.
+        </p>
+        <button
+          onClick={generateAndInsert}
+          disabled={loading}
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+        >
+          {loading ? (
+            <><div className="animate-spin text-lg">🌿</div> Generando...</>
+          ) : (
+            <><RefreshCw size={16} /> Generar lecturas aleatorias</>
+          )}
+        </button>
+      </div>
+
+      {generated && (
+        <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-4">
+          <h3 className="text-sm font-semibold text-green-700 mb-3">✅ Lecturas generadas</h3>
+          <div className="space-y-2">
+            {generated.map((r, i) => (
+              <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                <span className="text-sm text-gray-600">
+                  {typeEmoji[r.sensor_type]} {typeLabel[r.sensor_type]}
+                </span>
+                <span className="text-sm font-bold text-gray-800">
+                  {r.value} {typeUnit[r.sensor_type]}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            {new Date(generated[0].timestamp).toLocaleString('es-CO')}
+          </p>
+        </div>
+      )}
+
+      {history.length > 1 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">📋 Historial de simulaciones</h3>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {history.slice(1).map((h, i) => (
+              <div key={i} className="text-xs text-gray-500 flex items-center gap-2">
+                <span className="text-gray-300">•</span>
+                {new Date(h.time).toLocaleTimeString('es-CO')} — {h.readings.length} lecturas
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Alertas ────────────────────────────────────────────
+function AlertsPage() {
+  const [alerts, setAlerts]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadAlerts() }, [])
+
+  const loadAlerts = async () => {
+    if (!supabase) { setLoading(false); return }
+    try {
+      const { data } = await supabase
+        .from('alerts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (data) setAlerts(data)
+    } catch (err) {
+      console.error('Error cargando alertas:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const levelStyle = {
+    CRITICAL: 'bg-red-50 border-red-200 text-red-700',
+    WARNING:  'bg-yellow-50 border-yellow-200 text-yellow-700',
+    INFO:     'bg-blue-50 border-blue-200 text-blue-700'
+  }
+
+  const levelIcon = {
+    CRITICAL: '🔴',
+    WARNING:  '🟡',
+    INFO:     '🔵'
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">🔔 Alertas</h2>
+        <button onClick={loadAlerts}
+          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
+          <RefreshCw size={14} className="inline mr-1" /> Actualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin text-4xl">🌿</div>
+        </div>
+      ) : alerts.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Bell size={48} className="mx-auto mb-3 opacity-40" />
+          <p>No hay alertas recientes</p>
+          <p className="text-xs mt-1">El sistema monitoreará automáticamente</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {alerts.map(a => (
+            <div key={a.id}
+              className={`rounded-2xl border p-4 ${levelStyle[a.level] || 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+              <div className="flex items-start gap-2">
+                <span className="text-lg">{levelIcon[a.level] || '⚪'}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{a.message}</p>
+                  <p className="text-xs opacity-70 mt-1">
+                    {a.level} · {new Date(a.created_at).toLocaleString('es-CO')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Consultar IA ───────────────────────────────────────
+function AIPage() {
+  const [prompt, setPrompt]       = useState('')
+  const [response, setResponse]   = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [readings, setReadings]   = useState([])
+
+  useEffect(() => {
+    loadLatestReadings()
+  }, [])
+
+  const loadLatestReadings = async () => {
+    if (!supabase) return
+    try {
+      const { data } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(20)
+      if (data) setReadings(data)
+    } catch (err) {
+      console.error('Error cargando lecturas:', err)
+    }
+  }
+
+  const buildSensorContext = () => {
+    if (readings.length === 0) return ''
+    const byType = {}
+    readings.forEach(r => {
+      if (!byType[r.sensor_type]) byType[r.sensor_type] = r
+    })
+    let ctx = 'Lecturas actuales de sensores:\n'
+    for (const [type, r] of Object.entries(byType)) {
+      ctx += `- ${type}: ${r.value.toFixed(1)} (${new Date(r.timestamp).toLocaleTimeString('es-CO')})\n`
+    }
+    return ctx
+  }
+
+  const sendPrompt = async (text) => {
+    const question = text || prompt
+    if (!question.trim()) return
+    setLoading(true)
+    setResponse('')
+    const result = await callAI(question, buildSensorContext())
+    setResponse(result)
+    setLoading(false)
+  }
+
+  const presets = [
+    { label: '📊 Analizar estado', prompt: 'Analiza el estado actual del invernadero basándote en las lecturas de sensores. Identifica problemas y sugiere acciones correctivas.' },
+    { label: '🌱 Recomendar cultivo', prompt: 'Dame recomendaciones para mejorar el cuidado del cultivo actual basándote en las condiciones del invernadero.' },
+    { label: '⚙️ Predecir actuadores', prompt: 'Basándote en las lecturas actuales, predice qué actuadores será necesario activar en las próximas horas y por qué.' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">🤖 Consultar IA</h2>
+
+      {/* Estado de conexión */}
+      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl ${
+        getOpenRouterKey() ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+      }`}>
+        {getOpenRouterKey() ? (
+          <><CheckCircle size={14} /> IA conectada (OpenRouter - Gemini Experimental Gratis)</>
+        ) : (
+          <><XCircle size={14} /> Sin clave de IA. Ve a Configuración para ingresarla.</>
+        )}
+      </div>
+
+      {/* Botones predefinidos */}
+      <div className="grid grid-cols-3 gap-2">
+        {presets.map((p, i) => (
+          <button key={i}
+            onClick={() => sendPrompt(p.prompt)}
+            disabled={loading}
+            className="bg-white border border-gray-200 hover:border-green-400 hover:bg-green-50 rounded-xl p-3 text-xs font-medium text-gray-700 transition-all disabled:opacity-50"
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Prompt libre */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <textarea
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          rows={3}
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+          placeholder="Escribe tu pregunta sobre el invernadero..."
+        />
+        <button
+          onClick={() => sendPrompt()}
+          disabled={loading || !prompt.trim()}
+          className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+        >
+          {loading ? (
+            <><div className="animate-spin text-lg">🌿</div> Consultando IA...</>
+          ) : (
+            <><Send size={16} /> Enviar consulta</>
+          )}
+        </button>
+      </div>
+
+      {/* Respuesta de la IA */}
+      {(response || loading) && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-green-100 rounded-lg">
+              <Bot size={16} className="text-green-700" />
+            </div>
+            <span className="text-sm font-semibold text-gray-700">Respuesta de AgroPulse IA</span>
+          </div>
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin text-xl">🌿</div>
+              Analizando datos del invernadero...
+            </div>
+          ) : (
+            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {response}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Info de contexto */}
+      {readings.length > 0 && (
+        <p className="text-xs text-gray-400 text-center">
+          La IA utiliza datos de {readings.length} lecturas recientes de sensores como contexto.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Página ML Predicciones ───────────────────────────────────────
+function MLPage() {
+  const [prediction, setPrediction] = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [readings, setReadings]     = useState([])
+
+  useEffect(() => { loadReadings() }, [])
+
+  const loadReadings = async () => {
+    if (!supabase) return
+    try {
+      const { data } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(30)
+      if (data) setReadings(data)
+    } catch (err) {
+      console.error('Error cargando lecturas:', err)
+    }
+  }
+
+  const buildContext = () => {
+    if (readings.length === 0) return ''
+    const byType = {}
+    readings.forEach(r => {
+      if (!byType[r.sensor_type]) byType[r.sensor_type] = []
+      byType[r.sensor_type].push(r)
+    })
+    let ctx = 'Historial reciente de sensores (últimas lecturas):\n'
+    for (const [type, items] of Object.entries(byType)) {
+      const values = items.slice(0, 10).map(r => r.value.toFixed(1)).join(', ')
+      ctx += `- ${type}: [${values}]\n`
+    }
+    return ctx
+  }
+
+  const predict = async () => {
+    setLoading(true)
+    setPrediction('')
+    const ctx = buildContext()
+    const prompt = `Basándote en el historial reciente de sensores del invernadero, predice los valores de cada sensor para las próximas 6 horas (en intervalos de 1 hora).
+
+Presenta los resultados en un formato claro con:
+- Hora estimada
+- Valores predichos para cada sensor
+- Tendencia (subiendo, bajando, estable)
+- Acciones recomendadas si algún valor saldrá de rango
+
+Sé conciso y práctico.`
+
+    const result = await callAI(prompt, ctx)
+    setPrediction(result)
+    setLoading(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">📈 ML — Predicciones</h2>
+
+      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl ${
+        getOpenRouterKey() ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+      }`}>
+        {getOpenRouterKey() ? (
+          <><CheckCircle size={14} /> Motor de predicción activo (Gemini Experimental)</>
+        ) : (
+          <><XCircle size={14} /> Configura la clave de IA para usar predicciones.</>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <p className="text-sm text-gray-600 mb-3">
+          Utiliza inteligencia artificial para predecir los valores futuros de los sensores basándose en el historial reciente.
+        </p>
+        <button
+          onClick={predict}
+          disabled={loading}
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+        >
+          {loading ? (
+            <><div className="animate-spin text-lg">🌿</div> Calculando predicción...</>
+          ) : (
+            <><BarChart3 size={16} /> Predecir próximas 6 horas</>
+          )}
+        </button>
+      </div>
+
+      {readings.length > 0 && !prediction && !loading && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">📡 Datos disponibles para predicción</h3>
+          <p className="text-xs text-gray-500">{readings.length} lecturas recientes cargadas como contexto.</p>
+        </div>
+      )}
+
+      {(prediction || loading) && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-purple-100 rounded-lg">
+              <Cpu size={16} className="text-purple-700" />
+            </div>
+            <span className="text-sm font-semibold text-gray-700">Predicción AgroPulse ML</span>
+          </div>
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="animate-spin text-xl">🌿</div>
+              Analizando tendencias y calculando predicción...
+            </div>
+          ) : (
+            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {prediction}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Página de Tickets de Soporte ──────────────────────────────────
+function SupportPage() {
+  const { user } = useAuth()
+  const [tickets, setTickets]     = useState([])
+  const [subject, setSubject]     = useState('')
+  const [description, setDesc]    = useState('')
+  const [loading, setLoading]     = useState(false)
+
+  useEffect(() => { loadTickets() }, [])
+
+  const loadTickets = async () => {
+    if (!supabase) return
+    const { data } = await supabase
+      .from('support_tickets')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    if (data) setTickets(data)
+  }
+
+  const submitTicket = async (e) => {
+    e.preventDefault()
+    if (!subject.trim() || !description.trim()) return
+    if (!supabase) return
+    setLoading(true)
+    await supabase.from('support_tickets').insert({
+      user_id: user.id,
+      subject, description,
+      status: 'OPEN', priority: 'MEDIUM',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    setSubject(''); setDesc('')
+    await loadTickets()
+    setLoading(false)
+    alert('✅ Ticket enviado al administrador.')
+  }
+
+  const statusColors = {
+    OPEN: 'bg-yellow-100 text-yellow-700',
+    IN_PROGRESS: 'bg-blue-100 text-blue-700',
+    RESOLVED: 'bg-green-100 text-green-700',
+    CLOSED: 'bg-gray-100 text-gray-600'
+  }
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <h3 className="font-semibold text-gray-700 mb-3">➕ Nuevo Ticket</h3>
+        <form onSubmit={submitTicket} className="space-y-3">
+          <input
+            value={subject} onChange={e => setSubject(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+            placeholder="Asunto del problema..."
+          />
+          <textarea
+            value={description} onChange={e => setDesc(e.target.value)}
+            rows={3}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
+            placeholder="Describe el problema en detalle..."
+          />
+          <button type="submit" disabled={loading}
+            className="w-full bg-green-600 text-white py-2 rounded-xl text-sm font-medium disabled:opacity-50">
+            {loading ? 'Enviando...' : '📨 Enviar Ticket'}
+          </button>
+        </form>
+      </div>
+
+      <div className="space-y-3">
+        {tickets.map(t => (
+          <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-sm text-gray-800">{t.subject}</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[t.status] || 'bg-gray-100'}`}>
+                {t.status}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500">{t.description}</p>
+            {t.admin_response && (
+              <div className="mt-2 p-2 bg-green-50 rounded-xl">
+                <p className="text-xs font-medium text-green-700">Respuesta del admin:</p>
+                <p className="text-xs text-green-600">{t.admin_response}</p>
+              </div>
+            )}
+          </div>
+        ))}
+        {tickets.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-8">No tienes tickets aún.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Página de Configuración ──────────────────────────────────────
+function SettingsPage() {
+  const { user, logout } = useAuth()
+  const [orKey, setOrKey]           = useState(safeGet('agropulse_openrouter_key') || '')
+  const [saved, setSaved]           = useState(false)
+
+  const saveKey = () => {
+    if (orKey.trim()) {
+      safeSet('agropulse_openrouter_key', orKey.trim())
+    } else {
+      safeRemove('agropulse_openrouter_key')
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const hasEnvKey = !!import.meta.env.VITE_OPENROUTER_KEY
+  const activeKey = getOpenRouterKey()
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">⚙️ Configuración</h2>
+
+      {/* Info del sistema */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          <Info size={14} className="inline mr-1" /> Información del Sistema
+        </h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Versión</span>
+            <span className="font-medium text-gray-800">AgroPulse v6.0</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Build</span>
+            <span className="font-medium text-gray-800">2025.03</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">WebApp</span>
+            <span className="font-medium text-gray-800">React + Vite</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Usuario</span>
+            <span className="font-medium text-gray-800">{user?.full_name || user?.username}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Rol</span>
+            <span className="font-medium text-gray-800">{user?.role || 'OPERATOR'}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">Supabase</span>
+            <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+              supabase ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+              {supabase ? <><Wifi size={12} /> Conectado</> : <><WifiOff size={12} /> No configurado</>}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">IA (OpenRouter)</span>
+            <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+              activeKey ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {activeKey ? <><CheckCircle size={12} /> Configurada</> : <><XCircle size={12} /> Sin clave</>}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Configurar API Key */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          <Key size={14} className="inline mr-1" /> Clave de IA (OpenRouter)
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Obtén tu clave gratuita en <span className="font-semibold">openrouter.ai</span> → Sign up → API Keys.
+          Incluye acceso a Gemini 2.0 Flash y LLaMA-70B gratis.
+        </p>
+        {hasEnvKey && (
+          <p className="text-xs text-green-600 mb-2">
+            ✅ Se detectó una clave en las variables de entorno (.env).
+          </p>
+        )}
+        <input
+          type="password"
+          value={orKey}
+          onChange={e => setOrKey(e.target.value)}
+          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          placeholder="sk-or-v1-..."
+        />
+        <button
+          onClick={saveKey}
+          className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl text-sm font-medium transition-colors"
+        >
+          {saved ? '✅ Guardada' : '💾 Guardar clave'}
+        </button>
+      </div>
+
+      {/* Equipo de desarrollo */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+          👥 Equipo de Desarrollo
+        </h3>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Desarrollador</span>
+            <span className="font-medium text-gray-800">Leider Cadena</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Universidad</span>
+            <span className="font-medium text-gray-800 text-right">Cooperativa de Colombia - Nariño</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Proyecto</span>
+            <span className="font-medium text-gray-800">Grado 2025</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Cerrar sesión */}
+      <button
+        onClick={logout}
+        className="w-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+      >
+        <LogOut size={16} /> Cerrar sesión
+      </button>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  APP PRINCIPAL
+// ══════════════════════════════════════════════════════════════════
+
+export default function App() {
+  const [user, setUser]               = useState(null)
+  const [page, setPage]               = useState('dashboard')
+  const [authLoading, setAuthLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Verificar sesión de Supabase Auth (Google OAuth redirect)
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false)
+      return
+    }
+
+    const findOrCreateUser = async (authUser) => {
+      try {
+        // Buscar usuario existente por email
+        const { data: existing } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authUser.email)
+          .eq('active', 1)
+          .single()
+
+        if (existing) {
+          setUser(existing)
+          return
+        }
+
+        // Buscar por username (parte antes del @)
+        const username = authUser.email.split('@')[0]
+        const { data: byUsername } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .eq('active', 1)
+          .single()
+
+        if (byUsername) {
+          setUser(byUsername)
+          return
+        }
+
+        // Si no existe, usar datos de Google como usuario temporal
+        setUser({
+          id: authUser.id,
+          username: username,
+          full_name: authUser.user_metadata?.full_name || authUser.email,
+          email: authUser.email,
+          role: 'OPERATOR',
+          active: 1
+        })
+      } catch (err) {
+        console.error('Error buscando usuario:', err)
+        // Fallback: usar datos de Google directamente
+        setUser({
+          id: authUser.id,
+          username: authUser.email.split('@')[0],
+          full_name: authUser.user_metadata?.full_name || authUser.email,
+          email: authUser.email,
+          role: 'OPERATOR',
+          active: 1
+        })
+      }
+    }
+
+    // Verificar sesión existente
+    if (!supabase) {
+      setAuthLoading(false)
+      return
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        findOrCreateUser(session.user)
+      }
+      setAuthLoading(false)
+    })
+
+    // Escuchar cambios de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        findOrCreateUser(session.user)
+      }
+      setAuthLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleLogin = (userData) => setUser(userData)
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut().catch(() => {})
+    }
+    setUser(null)
+    setPage('dashboard')
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-800 to-green-600 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin text-5xl mb-4">🌿</div>
+          <p className="text-lg font-medium">Cargando AgroPulse...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) return <LoginPage onLogin={handleLogin} />
+
+  const navItems = [
+    { id: 'dashboard', label: 'Inicio',      icon: Home },
+    { id: 'sensors',   label: 'Sensores',    icon: Activity },
+    { id: 'actuators', label: 'Actuadores',  icon: Zap },
+    { id: 'crops',     label: 'Cultivos',    icon: Leaf },
+    { id: 'simulate',  label: 'Simular',     icon: RefreshCw },
+    { id: 'ai',        label: 'IA',          icon: Bot },
+    { id: 'ml',        label: 'ML',          icon: Cpu },
+    { id: 'alerts',    label: 'Alertas',     icon: Bell },
+    { id: 'support',   label: 'Soporte',     icon: MessageCircle },
+    { id: 'settings',  label: 'Config',      icon: Settings },
+  ]
+
+  const navigate = (id) => {
+    setPage(id)
+    setSidebarOpen(false)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, logout: handleLogout }}>
+      <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative">
+
+        {/* Sidebar Overlay */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-30 max-w-md mx-auto"
+            onClick={() => setSidebarOpen(false)} />
+        )}
+
+        {/* Sidebar Menu */}
+        <div className={`fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`} style={{ maxWidth: 'calc((100vw - 0px) / 2 + 144px)' }}>
+          {/* Sidebar Header */}
+          <div className="bg-green-700 text-white px-5 py-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold">🌿 AgroPulse</span>
+                <span className="text-xs opacity-60 bg-green-600 px-1.5 py-0.5 rounded">v6.0</span>
+              </div>
+              <p className="text-xs opacity-70 mt-1">{user.full_name || user.username}</p>
+            </div>
+            <button onClick={() => setSidebarOpen(false)}
+              className="p-1 hover:bg-green-600 rounded-lg transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Sidebar Nav Items */}
+          <div className="py-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+            {navItems.map(item => {
+              const Icon = item.icon
+              const active = page === item.id
+              return (
+                <button key={item.id}
+                  onClick={() => navigate(item.id)}
+                  className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-colors ${
+                    active
+                      ? 'bg-green-50 text-green-700 font-semibold border-r-4 border-green-600'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  <Icon size={20} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {active && <ChevronRight size={16} className="text-green-400" />}
+                </button>
+              )
+            })}
+
+            {/* Logout in sidebar */}
+            <div className="border-t border-gray-100 mt-2 pt-2">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                <LogOut size={20} />
+                <span>Cerrar sesión</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Header */}
+        <header className="bg-green-700 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSidebarOpen(true)}
+              className="p-1.5 hover:bg-green-600 rounded-lg transition-colors">
+              <Menu size={20} />
+            </button>
+            <span className="text-lg font-bold">🌿 AgroPulse</span>
+            <span className="text-xs opacity-60 bg-green-600 px-1.5 py-0.5 rounded">v6.0</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs opacity-80">{user.full_name || user.username}</span>
+          </div>
+        </header>
+
+        {/* Contenido */}
+        <main className="px-4 py-4 pb-6">
+          {page === 'dashboard' && <Dashboard />}
+          {page === 'sensors'   && <SensorsPage />}
+          {page === 'actuators' && <ActuatorsPage />}
+          {page === 'crops'     && <CropsPage />}
+          {page === 'simulate'  && <SimulationPage />}
+          {page === 'ai'        && <AIPage />}
+          {page === 'ml'        && <MLPage />}
+          {page === 'alerts'    && <AlertsPage />}
+          {page === 'support'   && <SupportPage />}
+          {page === 'settings'  && <SettingsPage />}
+        </main>
+      </div>
+    </AuthContext.Provider>
+  )
+}

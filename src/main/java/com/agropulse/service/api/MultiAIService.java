@@ -29,22 +29,13 @@ public class MultiAIService implements AIService {
     // Timeout por servicio (segundos) — Groq y Ollama son los extremos
     private static final int TIMEOUT_SECONDS = 60;
 
+    // Constructor con solo las 3 APIs funcionales
     public MultiAIService(GroqService groq, OllamaService ollama, GitHubModelsService github) {
         if (groq    != null) services.put("⚡ Groq",       groq);
         if (ollama != null) services.put("💻 Ollama",     ollama);
-        if (github!= null) services.put("🐙 GitHub",    github);
+        if (github != null) services.put("🐙 GitHub",     github);
 
         this.executor = Executors.newFixedThreadPool(Math.max(services.size(), 1));
-    }
-
-    // Legacy constructor (deprecated - solo IAs gratuitas)
-    @Deprecated
-    public MultiAIService(OpenAIService  openAI,
-                          OpenRouterService openRouter,
-                          GroqService    groq,
-                          OllamaService  ollama,
-                          MistralService mistral) {
-        this(groq, ollama, null);
     }
 
     // ─── AIService interface ──────────────────────────────────────────
