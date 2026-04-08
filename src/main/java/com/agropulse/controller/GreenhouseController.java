@@ -142,26 +142,42 @@ public class GreenhouseController {
     }
 
     public double[] calculateAverageRange(int sensorId) {
-        Optional<Sensor> optSensor = sensorDao.findById(sensorId);
+        List<Sensor> allSensors = sensorDao.findAll();
+        Optional<Sensor> optSensor = allSensors.stream().filter(s -> s.getId() == sensorId).findFirst();
         if (optSensor.isEmpty()) return null;
         Sensor sensor = optSensor.get();
 
-        List<SensorReading> readings = readingDao.findBySensorId(sensorId, 100);
-        if (readings.isEmpty()) return null;
+        List<Crop> crops = cropDao.findAll();
+        if (crops.isEmpty()) return null;
 
-        double sum = 0;
-        double min = Double.MAX_VALUE;
-        double max = Double.MIN_VALUE;
+        String typeName = sensor.getType().name();
 
-        for (SensorReading r : readings) {
-            double val = r.getValue();
-            sum += val;
-            if (val < min) min = val;
-            if (val > max) max = val;
+        double sumMin = 0, sumMax = 0;
+        int count = 0;
+
+        for (Crop c : crops) {
+            switch (typeName) {
+                case "TEMPERATURE" -> {
+                    sumMin += c.getTempMin();
+                    sumMax += c.getTempMax();
+                }
+                case "HUMIDITY" -> {
+                    sumMin += c.getHumidityMin();
+                    sumMax += c.getHumidityMax();
+                }
+                case "SOIL_MOISTURE" -> {
+                    sumMin += c.getSoilMoistureMin();
+                    sumMax += c.getSoilMoistureMax();
+                }
+                default -> {
+                    return null;
+                }
+            }
+            count++;
         }
 
-        double avg = sum / readings.size();
-        return new double[]{avg - (avg * 0.1), avg + (avg * 0.1)};
+        if (count == 0) return null;
+        return new double[]{sumMin / count, sumMax / count};
     }
 
     private void initializeHardware() {
