@@ -83,7 +83,7 @@ public class ConfigRangesPanel extends javax.swing.JPanel implements Refreshable
         JPanel card = new JPanel(new GridBagLayout());
         card.setBackground(Color.WHITE);
         card.setBorder(AppTheme.cardBorder());
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 140));
         card.setAlignmentX(LEFT_ALIGNMENT);
 
         GridBagConstraints g = new GridBagConstraints();
@@ -107,9 +107,48 @@ public class ConfigRangesPanel extends javax.swing.JPanel implements Refreshable
         txtMax.setText(String.format("%.1f", sensor.getMaxValue()));
         txtMax.setPreferredSize(new Dimension(100, 32)); card.add(txtMax, g);
 
-        g.gridy = 2; g.gridx = 0; g.gridwidth = 4; g.fill = GridBagConstraints.NONE;
+        g.gridy = 2; g.gridx = 0; g.gridwidth = 1;
+        JButton btnAvg = AppTheme.secondaryButton("📊 Calcular promedio");
+        btnAvg.setPreferredSize(new Dimension(160, 34));
+        final Sensor finalSensor = sensor;
+        final JTextField finalTxtMin = txtMin;
+        final JTextField finalTxtMax = txtMax;
+        btnAvg.addActionListener(e -> {
+            btnAvg.setEnabled(false);
+            btnAvg.setText("⏳ Calculando...");
+            new SwingWorker<double[], Void>() {
+                @Override protected double[] doInBackground() {
+                    return controller.calculateAverageRange(finalSensor.getId());
+                }
+                @Override protected void done() {
+                    btnAvg.setEnabled(true);
+                    btnAvg.setText("📊 Calcular promedio");
+                    try {
+                        double[] avg = get();
+                        if (avg != null) {
+                            finalTxtMin.setText(String.format("%.1f", avg[0]));
+                            finalTxtMax.setText(String.format("%.1f", avg[1]));
+                            JOptionPane.showMessageDialog(card, 
+                                "✅ Promedio calculado:\nMín: " + String.format("%.1f", avg[0]) + 
+                                " | Máx: " + String.format("%.1f", avg[1]), 
+                                "OK", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(card, 
+                                "⚠️ No hay lecturas suficientes para calcular el promedio.", 
+                                "Advertencia", JOptionPane.WARNING_MESSAGE);
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(card, "Error: " + ex.getMessage(), 
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        });
+        card.add(btnAvg, g);
+
+        g.gridx = 2; g.gridwidth = 2;
         JButton btnSave = AppTheme.primaryButton("💾 Guardar");
-        btnSave.setPreferredSize(new Dimension(160, 34));
+        btnSave.setPreferredSize(new Dimension(120, 34));
         btnSave.addActionListener(e -> {
             try {
                 double min = Double.parseDouble(txtMin.getText().trim());

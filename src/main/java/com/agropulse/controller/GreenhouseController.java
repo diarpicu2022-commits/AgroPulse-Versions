@@ -141,6 +141,29 @@ public class GreenhouseController {
         rangeDao.save(new GreenhouseSensorRange(greenhouseId, "SOIL_MOISTURE", sumSoilMin / count, sumSoilMax / count));
     }
 
+    public double[] calculateAverageRange(int sensorId) {
+        Optional<Sensor> optSensor = sensorDao.findById(sensorId);
+        if (optSensor.isEmpty()) return null;
+        Sensor sensor = optSensor.get();
+
+        List<SensorReading> readings = readingDao.findBySensorId(sensorId, 100);
+        if (readings.isEmpty()) return null;
+
+        double sum = 0;
+        double min = Double.MAX_VALUE;
+        double max = Double.MIN_VALUE;
+
+        for (SensorReading r : readings) {
+            double val = r.getValue();
+            sum += val;
+            if (val < min) min = val;
+            if (val > max) max = val;
+        }
+
+        double avg = sum / readings.size();
+        return new double[]{avg - (avg * 0.1), avg + (avg * 0.1)};
+    }
+
     private void initializeHardware() {
         List<Sensor> existingSensors = sensorDao.findAll();
         if (existingSensors.isEmpty()) {
