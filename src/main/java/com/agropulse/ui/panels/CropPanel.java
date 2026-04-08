@@ -131,6 +131,10 @@ public class CropPanel extends javax.swing.JPanel implements Refreshable {
                 Crop crop = new Crop(txName.getText().trim(), txVariety.getText().trim(),
                     d(txTMin), d(txTMax), d(txHMin), d(txHMax), d(txSMin), d(txSMax));
                 controller.getCropDao().save(crop);
+                
+                // Calcular rangos automáticos del invernadero
+                controller.calculateAndSaveSensorRanges(1);
+                
                 controller.getLogDao().save(new SystemLog("CULTIVO","Agregado: "+crop.getName(), user.getUsername()));
                 refresh(); dlg.dispose();
                 JOptionPane.showMessageDialog(this, "✅ Cultivo guardado.", "OK", JOptionPane.INFORMATION_MESSAGE);
