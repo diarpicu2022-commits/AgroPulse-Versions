@@ -44,7 +44,7 @@ public class GreenhouseSelectorPanel extends JPanel {
         setOpaque(false);
 
         JLabel lbl = new JLabel("🏠 Invernadero:");
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lbl.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
         lbl.setForeground(Color.WHITE);
 
         combo = new JComboBox<>();

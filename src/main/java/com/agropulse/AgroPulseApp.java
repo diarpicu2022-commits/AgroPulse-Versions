@@ -13,7 +13,7 @@ import javax.swing.*;
  * ║  Sistema de Monitoreo y Control Inteligente               ║
  * ║  de Invernadero                                           ║
  * ║                                                           ║
- * ║  Proyecto MTE - Universidad de Nariño                     ║
+ * ║  Proyecto de Semestre 2026 - Universidad de Nariño             ║
  * ║  Departamento de Nariño, Colombia                         ║
  * ╚═══════════════════════════════════════════════════════════╝
  *

@@ -169,6 +169,9 @@ public class AppConfig {
     public String getGitHubToken() { return get("github_token"); }
     public boolean isGitHubEnabled() { return "true".equals(get("github_enabled")); }
     public void setGitHubEnabled(boolean v) { set("github_enabled", String.valueOf(v)); }
+    public String getGithubKey() { return getGitHubToken(); }
+    public void setGithubEnabled(boolean v) { setGitHubEnabled(v); }
+    public boolean isGithubEnabled() { return isGitHubEnabled(); }
 
     // ─── Mistral ────────────────────────────────────────────────────
     public String getMistralKey()              { return get("mistral_api_key"); }

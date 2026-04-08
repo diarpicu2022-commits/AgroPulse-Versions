@@ -149,7 +149,7 @@ public class ConsoleUtils {
         System.out.println("   ║     Sistema de Monitoreo y Control                    ║");
         System.out.println("   ║     Inteligente de Invernadero                        ║");
         System.out.println("   ║                                                       ║");
-        System.out.println("   ║     Proyecto MTE - Universidad de Nariño              ║");
+        System.out.println("   ║     Proyecto de Semestre 2026 - Universidad de Nariño ║");
         System.out.println("   ║                                                       ║");
         System.out.println("   ╚═══════════════════════════════════════════════════════╝");
         System.out.println(RESET);

@@ -101,9 +101,9 @@ public class SystemConfigPanel extends javax.swing.JPanel implements Refreshable
         teamGrid.setBackground(Color.WHITE);
         teamGrid.setBorder(new EmptyBorder(0, 12, 8, 12));
 
-        addTeamRow(teamGrid, "Desarrollador:", "Leider Cadena - Desarrollador Principal");
+        addTeamRow(teamGrid, "Desarrollador:", "Diego Armando Pinta Cuasquen");
         addTeamRow(teamGrid, "Universidad:", "Universidad Cooperativa de Colombia - Nariño");
-        addTeamRow(teamGrid, "Proyecto:", "Proyecto de Grado 2025");
+        addTeamRow(teamGrid, "Proyecto:", "Proyecto de Semestre 2026");
 
         pnlTeam.add(teamGrid);
 
@@ -121,8 +121,8 @@ public class SystemConfigPanel extends javax.swing.JPanel implements Refreshable
         pnlInfoGrid.setBackground(Color.WHITE);
         pnlInfoGrid.setBorder(new EmptyBorder(0, 8, 8, 8));
 
-        addInfoRow("Versión:",        "AgroPulse v6.0");
-        addInfoRow("Build:",          "2025.03");
+        addInfoRow("Versión:",        "AgroPulse v9.0");
+        addInfoRow("Build:",          "2026.04");
         addInfoRow("Java:",           System.getProperty("java.version"));
         addInfoRow("Sistema Oper.:",  System.getProperty("os.name"));
         addInfoRow("Base de datos:",  "SQLite (local)");
@@ -232,29 +232,23 @@ public class SystemConfigPanel extends javax.swing.JPanel implements Refreshable
     private void refreshAIDetail() {
         StringBuilder sb = new StringBuilder("<html><div style='font-family:Segoe UI Emoji'><small>");
         int count = 0;
-        if (cfg.isOpenRouterEnabled()) { sb.append("✅ OpenRouter &nbsp; "); count++; }
-        else sb.append("⛔ OpenRouter &nbsp; ");
         if (cfg.isGroqEnabled()) { sb.append("✅ Groq &nbsp; "); count++; }
         else sb.append("⛔ Groq &nbsp; ");
-        if (cfg.isMistralEnabled()) { sb.append("✅ Mistral &nbsp; "); count++; }
-        else sb.append("⛔ Mistral &nbsp; ");
+        if (cfg.isGithubEnabled()) { sb.append("✅ GitHub &nbsp; "); count++; }
+        else sb.append("⛔ GitHub &nbsp; ");
         if (cfg.isOllamaEnabled()) { sb.append("✅ Ollama &nbsp; "); count++; }
         else sb.append("⛔ Ollama &nbsp; ");
-        if (cfg.isOpenAIEnabled()) { sb.append("✅ OpenAI &nbsp; "); count++; }
-        else sb.append("⛔ OpenAI &nbsp; ");
-        sb.append("<br><b>").append(count).append(" de 5 servicios activos</b></small></div></html>");
+        sb.append("<br><b>").append(count).append(" de 3 servicios activos</b></small></div></html>");
         if (lblAIDetail != null) lblAIDetail.setText(sb.toString());
         if (lblActiveAIs != null) lblActiveAIs.setText(getActiveAIsText());
     }
 
     private String getActiveAIsText() {
         int count = 0;
-        if (cfg.isOpenRouterEnabled()) count++;
         if (cfg.isGroqEnabled()) count++;
-        if (cfg.isMistralEnabled()) count++;
+        if (cfg.isGithubEnabled()) count++;
         if (cfg.isOllamaEnabled()) count++;
-        if (cfg.isOpenAIEnabled()) count++;
-        return count + " de 5 servicios";
+        return count + " de 3 servicios";
     }
 
     @Override public void refresh() {

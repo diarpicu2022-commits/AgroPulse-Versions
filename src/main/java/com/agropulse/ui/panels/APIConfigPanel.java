@@ -14,12 +14,10 @@ import java.awt.*;
 /**
  * Panel Configuración de APIs de IA.
  *
- * Proveedores:
- *   🤖 OpenAI       – opcional, requiere key de pago
- *   🌐 OpenRouter   – GRATIS sin tarjeta (Gemini Experimental + LLaMA-70B)
- *   ⚡ Groq         – GRATIS (LLaMA-3.3-70B ultra-rápido)
+ * Proveedores activos (solo los que funcionan):
+ *   ⚡ Groq         – GRAT#ISO (LLaMA-3.3-70B ultra-rápido)
+ *   🐙 GitHub       – GRAT#ISO (phi-4-mini)
  *   💻 Ollama       – local, sin internet
- *   🔮 Mistral      – Mistral AI, excelente para agricultura
  *   💬 WhatsApp     – Green API
  */
 public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
@@ -60,11 +58,9 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
 
         JButton btnEnableAll = AppTheme.primaryButton("✅ Activar Todas las APIs");
         btnEnableAll.addActionListener(e -> {
-            tglOpenAI.setSelected(true);
-            tglOpenRouter.setSelected(true);
             tglGroq.setSelected(true);
+            tglGithub.setSelected(true);
             tglOllama.setSelected(true);
-            tglMistral.setSelected(true);
             tglWA.setSelected(true);
             ok("✅ Todas las APIs activadas. Recuerda guardar cada una.");
         });
@@ -76,11 +72,9 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         btnDisableAll.setForeground(Color.WHITE);
         btnDisableAll.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btnDisableAll.addActionListener(e -> {
-            tglOpenAI.setSelected(false);
-            tglOpenRouter.setSelected(false);
             tglGroq.setSelected(false);
+            tglGithub.setSelected(false);
             tglOllama.setSelected(false);
-            tglMistral.setSelected(false);
             tglWA.setSelected(false);
             ok("⛔ Todas las APIs desactivadas. Recuerda guardar cada una.");
         });
@@ -88,18 +82,16 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         pnlBulk.add(btnEnableAll);
         pnlBulk.add(btnDisableAll);
 
-        // Fila superior: OpenAI | OpenRouter | Groq
+        // Fila superior: Groq | GitHub | Ollama
         JPanel pnlTop = new JPanel(new GridLayout(1, 3, 12, 0));
         pnlTop.setBackground(AppTheme.BG_MAIN);
-        pnlTop.add(buildOpenAICard());
-        pnlTop.add(buildOpenRouterCard());
         pnlTop.add(buildGroqCard());
+        pnlTop.add(buildGithubCard());
+        pnlTop.add(buildOllamaCard());
 
-        // Fila inferior: Ollama | Mistral | WhatsApp
-        JPanel pnlBot = new JPanel(new GridLayout(1, 3, 12, 0));
+        // Fila inferior: WhatsApp
+        JPanel pnlBot = new JPanel(new GridLayout(1, 1, 12, 0));
         pnlBot.setBackground(AppTheme.BG_MAIN);
-        pnlBot.add(buildOllamaCard());
-        pnlBot.add(buildMistralCard());
         pnlBot.add(buildWhatsAppCard());
 
         JPanel pnlGrid = new JPanel(new GridLayout(2, 1, 0, 12));
@@ -126,58 +118,6 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
 
     // ─── Tarjetas ─────────────────────────────────────────────────
 
-    private JPanel buildOpenAICard() {
-        JPanel card = card();
-        txtOpenAIKey = pwd();
-        tglOpenAI    = toggle("OpenAI", cfg.isOpenAIEnabled());
-        hookToggle(tglOpenAI);
-        JButton btn = saveBtn("💾 Guardar OpenAI", () -> {
-            cfg.set("openai_api_key", new String(txtOpenAIKey.getPassword()));
-            cfg.setOpenAIEnabled(tglOpenAI.isSelected());
-            controller.refreshAIServices();
-            log("CONFIG_API", "OpenAI guardado");
-            ok("✅ OpenAI guardado.");
-        });
-        addRows(card, sectionLabel("🤖 OpenAI (ChatGPT)"),
-                row("API Key (sk-...)", txtOpenAIKey), tglOpenAI, btn);
-        return card;
-    }
-
-    private JPanel buildOpenRouterCard() {
-        JPanel card = card();
-        txtOpenRouterKey = pwd();
-        tglOpenRouter    = toggle("OpenRouter", cfg.isOpenRouterEnabled());
-        hookToggle(tglOpenRouter);
-
-        JLabel hint = new JLabel(
-            "<html><div style='font-family:Segoe UI Emoji'><small>✅ <b>Gratis sin tarjeta.</b><br>" +
-            "1. Ir a <b>openrouter.ai</b> → Sign up<br>" +
-            "2. Keys → Create Key → copiar aquí<br>" +
-            "Incluye Gemini 2.0 Flash + LLaMA-70B gratis</small></div></html>");
-        hint.setFont(AppTheme.FONT_SMALL);
-        hint.setForeground(new Color(0x1B5E20));
-        hint.setAlignmentX(LEFT_ALIGNMENT);
-
-        JButton btn = saveBtn("💾 Guardar OpenRouter", () -> {
-            cfg.set("openrouter_api_key", new String(txtOpenRouterKey.getPassword()));
-            cfg.setOpenRouterEnabled(tglOpenRouter.isSelected());
-            controller.refreshAIServices();
-            log("CONFIG_API", "OpenRouter guardado");
-            ok("✅ OpenRouter guardado. Gemini 2.0 Flash gratis activo.");
-        });
-
-        card.add(sectionLabel("🌐 OpenRouter (Gemini Gratis)"));
-        card.add(Box.createVerticalStrut(6));
-        card.add(hint);
-        card.add(Box.createVerticalStrut(8));
-        card.add(row("API Key (sk-or-v1-...)", txtOpenRouterKey));
-        card.add(tglOpenRouter);
-        card.add(Box.createVerticalStrut(8));
-        card.add(btn);
-        card.add(Box.createVerticalGlue());
-        return card;
-    }
-
     private JPanel buildGroqCard() {
         JPanel card = card();
         txtGroqKey = pwd();
@@ -192,6 +132,41 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         });
         addRows(card, sectionLabel("⚡ Groq (LLaMA-3.3-70B Gratis)"),
                 row("API Key (gsk_...)", txtGroqKey), tglGroq, btn);
+        return card;
+    }
+
+    private JPanel buildGithubCard() {
+        JPanel card = card();
+        txtGithubKey = pwd();
+        tglGithub    = toggle("GitHub", cfg.isGithubEnabled());
+        hookToggle(tglGithub);
+
+        JLabel hint = new JLabel(
+            "<html><div style='font-family:Segoe UI Emoji'><small>✅ <b>Gratis sin tarjeta.</b><br>" +
+            "1. Ir a <b>github.com</b> → Settings → Developer settings<br>" +
+            "2. Personal access tokens → Fine-grained tokens<br>" +
+            "3. Generar token con permisos de Models AI</small></div></html>");
+        hint.setFont(AppTheme.FONT_SMALL);
+        hint.setForeground(new Color(0x1B5E20));
+        hint.setAlignmentX(LEFT_ALIGNMENT);
+
+        JButton btn = saveBtn("💾 Guardar GitHub", () -> {
+            cfg.set("github_api_key", new String(txtGithubKey.getPassword()));
+            cfg.setGithubEnabled(tglGithub.isSelected());
+            controller.refreshAIServices();
+            log("CONFIG_API", "GitHub guardado");
+            ok("✅ GitHub guardado. Modelos phi-4-mini activos.");
+        });
+
+        card.add(sectionLabel("🐙 GitHub Models (phi-4-mini Gratis)"));
+        card.add(Box.createVerticalStrut(6));
+        card.add(hint);
+        card.add(Box.createVerticalStrut(8));
+        card.add(row("PAT Token", txtGithubKey));
+        card.add(tglGithub);
+        card.add(Box.createVerticalStrut(8));
+        card.add(btn);
+        card.add(Box.createVerticalGlue());
         return card;
     }
 
@@ -232,40 +207,6 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         return card;
     }
 
-    private JPanel buildMistralCard() {
-        JPanel card = card();
-        txtMistralKey = pwd();
-        tglMistral    = toggle("Mistral", cfg.isMistralEnabled());
-        hookToggle(tglMistral);
-
-        JLabel hint = new JLabel(
-            "<html><div style='font-family:Segoe UI Emoji'><small>Mistral AI: excelente para<br>" +
-            "análisis agrícola y recomendaciones.<br>" +
-            "Obtén tu key en <b>console.mistral.ai</b></small></div></html>");
-        hint.setFont(AppTheme.FONT_SMALL);
-        hint.setForeground(AppTheme.TEXT_SECONDARY);
-        hint.setAlignmentX(LEFT_ALIGNMENT);
-
-        JButton btn = saveBtn("💾 Guardar Mistral", () -> {
-            cfg.set("mistral_api_key", new String(txtMistralKey.getPassword()));
-            cfg.setMistralEnabled(tglMistral.isSelected());
-            controller.refreshAIServices();
-            log("CONFIG_API", "Mistral guardado");
-            ok("✅ Mistral guardado.");
-        });
-
-        card.add(sectionLabel("🔮 Mistral AI"));
-        card.add(Box.createVerticalStrut(6));
-        card.add(hint);
-        card.add(Box.createVerticalStrut(8));
-        card.add(row("API Key", txtMistralKey));
-        card.add(tglMistral);
-        card.add(Box.createVerticalStrut(8));
-        card.add(btn);
-        card.add(Box.createVerticalGlue());
-        return card;
-    }
-
     private JPanel buildWhatsAppCard() {
         JPanel card = card();
         txtGreenUrl   = fld();
@@ -296,21 +237,15 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
 
     @Override
     public void refresh() {
-        if (txtOpenAIKey    != null) txtOpenAIKey.setText(cfg.getOpenAIKey());
-        if (tglOpenAI       != null) { tglOpenAI.setSelected(cfg.isOpenAIEnabled()); syncToggle(tglOpenAI); }
-
-        if (txtOpenRouterKey != null) txtOpenRouterKey.setText(cfg.getOpenRouterKey());
-        if (tglOpenRouter    != null) { tglOpenRouter.setSelected(cfg.isOpenRouterEnabled()); syncToggle(tglOpenRouter); }
-
         if (txtGroqKey  != null) txtGroqKey.setText(cfg.getGroqKey());
         if (tglGroq     != null) { tglGroq.setSelected(cfg.isGroqEnabled()); syncToggle(tglGroq); }
+
+        if (txtGithubKey != null) txtGithubKey.setText(cfg.getGithubKey());
+        if (tglGithub    != null) { tglGithub.setSelected(cfg.isGithubEnabled()); syncToggle(tglGithub); }
 
         if (txtOllamaHost  != null) txtOllamaHost.setText(cfg.getOllamaHost());
         if (txtOllamaModel != null) txtOllamaModel.setText(cfg.getOllamaModel());
         if (tglOllama      != null) { tglOllama.setSelected(cfg.isOllamaEnabled()); syncToggle(tglOllama); }
-
-        if (txtMistralKey != null) txtMistralKey.setText(cfg.getMistralKey());
-        if (tglMistral    != null) { tglMistral.setSelected(cfg.isMistralEnabled()); syncToggle(tglMistral); }
 
         if (txtGreenUrl   != null) txtGreenUrl.setText(cfg.getGreenApiUrl());
         if (txtGreenId    != null) txtGreenId.setText(cfg.getGreenIdInstance());
@@ -437,20 +372,16 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
 
     // ─── Variables privadas ───────────────────────────────────────
     private javax.swing.JLabel         lblTitle;
-    private javax.swing.JPasswordField txtOpenAIKey;
-    private javax.swing.JPasswordField txtOpenRouterKey;   // ← OpenRouter (no Gemini)
     private javax.swing.JPasswordField txtGroqKey;
+    private javax.swing.JPasswordField txtGithubKey;
     private javax.swing.JPasswordField txtGreenToken;
     private javax.swing.JTextField     txtOllamaHost;
     private javax.swing.JTextField     txtOllamaModel;
     private javax.swing.JTextField     txtGreenUrl;
     private javax.swing.JTextField     txtGreenId;
     private javax.swing.JTextField     txtAlertPhone;
-    private javax.swing.JToggleButton  tglOpenAI;
-    private javax.swing.JToggleButton  tglOpenRouter;      // ← OpenRouter (no Gemini)
     private javax.swing.JToggleButton  tglGroq;
+    private javax.swing.JToggleButton  tglGithub;
     private javax.swing.JToggleButton  tglOllama;
-    private javax.swing.JPasswordField txtMistralKey;
-    private javax.swing.JToggleButton  tglMistral;
     private javax.swing.JToggleButton  tglWA;
 }

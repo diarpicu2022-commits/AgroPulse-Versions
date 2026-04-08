@@ -23,49 +23,107 @@ const safeGet = (k) => _ls ? _ls.getItem(k) : (_memStore[k] || null)
 const safeSet = (k, v) => _ls ? _ls.setItem(k, v) : (_memStore[k] = v)
 const safeRemove = (k) => _ls ? _ls.removeItem(k) : (delete _memStore[k])
 
-// ── OpenRouter AI ────────────────────────────────────────────────
-const getOpenRouterKey = () => {
-  return safeGet('agropulse_openrouter_key')
-    || import.meta.env.VITE_OPENROUTER_KEY
+// ── IA Services (Groq, GitHub, Ollama) ────────────────────────────────────────────────
+const getGroqKey = () => {
+  return safeGet('agropulse_groq_key')
+    || import.meta.env.VITE_GROQ_KEY
+    || ''
+}
+
+const getGitHubToken = () => {
+  return safeGet('agropulse_github_token')
+    || import.meta.env.VITE_GITHUB_TOKEN
     || ''
 }
 
 async function callAI(prompt, sensorContext = '') {
-  const apiKey = getOpenRouterKey()
-  if (!apiKey) {
-    return '⚠️ No se ha configurado la clave de OpenRouter. Ve a Configuración para ingresarla.'
-  }
-
   const systemPrompt = `Eres un experto agrónomo e ingeniero de invernaderos. Tu nombre es AgroPulse IA.
 Respondes en español, de forma concisa y práctica.
 Siempre das recomendaciones basadas en datos reales de sensores cuando están disponibles.
 ${sensorContext ? `\nDatos actuales del invernadero:\n${sensorContext}` : ''}`
 
+  // Intentar Groq primero
+  const groqKey = getGroqKey()
+  if (groqKey) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 600
+        })
+      })
+      const data = await res.json()
+      if (data.choices && data.choices[0]) {
+        return data.choices[0].message.content
+      }
+    } catch (err) {
+      console.error('Groq error:', err)
+    }
+  }
+
+  // Intentar GitHub Models
+  const githubToken = getGitHubToken()
+  if (githubToken) {
+    try {
+      const res = await fetch('https://models.github.ai/inference/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${githubToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 600
+        })
+      })
+      const data = await res.json()
+      if (data.choices && data.choices[0]) {
+        return data.choices[0].message.content
+      }
+    } catch (err) {
+      console.error('GitHub error:', err)
+    }
+  }
+
+  // Intentar Ollama (local)
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const ollamaHost = import.meta.env.VITE_OLLAMA_HOST || 'http://localhost:11434'
+    const res = await fetch(`${ollamaHost}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'AgroPulse WebApp'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-exp-1121:free',
+        model: 'llama3.1',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
         ],
-        max_tokens: 600,
-        temperature: 0.7
+        stream: false
       })
     })
     const data = await res.json()
-    if (data.error) return '❌ Error de IA: ' + (data.error.message || JSON.stringify(data.error))
-    return data.choices?.[0]?.message?.content || 'Sin respuesta de la IA.'
+    if (data.message && data.message.content) {
+      return data.message.content
+    }
   } catch (err) {
-    return '❌ Error de conexión con la IA: ' + err.message
+    console.error('Ollama error:', err)
   }
+
+  return '⚠️ No hay servicio de IA disponible. Configura Groq o GitHub en Configuración.'
 }
 
 // ── Contexto de autenticación ────────────────────────────────────

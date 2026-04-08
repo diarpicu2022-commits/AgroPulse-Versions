@@ -111,11 +111,9 @@ public class MultiAIService implements AIService {
         if (active.isEmpty()) {
             return "⚠️  Ningún servicio de IA está activo.\n\n"
                  + "Ve a  🔌 Configurar APIs  y activa al menos un proveedor:\n"
-                 + "  • OpenAI  — necesita API key (sk-...)\n"
-                 + "  • Gemini  — necesita API key (AIza...)\n"
                  + "  • Groq    — necesita API key (gsk_...)\n"
-                 + "  • Ollama  — local, gratis (ollama serve)\n"
-                 + "  • Mistral— necesita API key";
+                 + "  • GitHub  — necesita PAT token\n"
+                 + "  • Ollama  — local, gratis (ollama serve)";
         }
 
         // Si hay un solo servicio activo, respuesta directa sin overhead
