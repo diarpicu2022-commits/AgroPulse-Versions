@@ -49,7 +49,11 @@ public class RestServer {
         System.out.println("    GET    /api/sensors");
         System.out.println("    GET    /api/crops");
         System.out.println("    GET    /api/greenhouses");
+        System.out.println("    GET    /api/actuators");
+        System.out.println("    GET    /api/users");
         System.out.println("    GET    /api/readings");
+        System.out.println("    GET    /api/alerts");
+        System.out.println("    GET    /api/logs");
         
         server.join();
     }
@@ -62,6 +66,12 @@ public class RestServer {
             controllers.put("/api/auth", new AuthRestController());
             controllers.put("/api/sensors", new SensorRestController());
             controllers.put("/api/crops", new CropRestController());
+            controllers.put("/api/greenhouses", new GreenhouseRestController());
+            controllers.put("/api/actuators", new ActuatorRestController());
+            controllers.put("/api/users", new UserRestController());
+            controllers.put("/api/readings", new ReadingRestController());
+            controllers.put("/api/alerts", new AlertRestController());
+            controllers.put("/api/logs", new LogRestController());
         }
         
         @Override

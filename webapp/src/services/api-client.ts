@@ -93,6 +93,15 @@ export const greenhouses = {
   delete: (id) => request(`/api/greenhouses/${id}`, { method: 'DELETE' }),
 };
 
+// Actuators
+export const actuators = {
+  list: () => request('/api/actuators'),
+  get: (id) => request(`/api/actuators/${id}`),
+  create: (data) => request('/api/actuators', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/api/actuators/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/api/actuators/${id}`, { method: 'DELETE' }),
+};
+
 // Users (admin)
 export const users = {
   list: () => request('/api/users'),
@@ -118,4 +127,4 @@ export const logs = {
   list: (limit = 100) => request(`/api/logs?limit=${limit}`),
 };
 
-export default { auth, sensors, crops, greenhouses, users, readings, alerts, logs };
+export default { auth, sensors, crops, greenhouses, actuators, users, readings, alerts, logs };
