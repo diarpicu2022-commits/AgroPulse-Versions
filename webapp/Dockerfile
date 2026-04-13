@@ -22,7 +22,7 @@ COPY webapp/vite.config.js ./
 COPY webapp/.env* ./
 
 # Variables de entorno para producción
-ENV VITE_API_URL=http://localhost:8080
+ENV VITE_API_URL=https://agropulse-versions-production.up.railway.app
 ENV NODE_ENV=production
 
 # Build de producción
