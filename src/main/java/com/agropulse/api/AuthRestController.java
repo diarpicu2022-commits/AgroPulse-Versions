@@ -71,7 +71,7 @@ public class AuthRestController extends JsonRestController {
         response.addProperty("id", user.getId());
         response.addProperty("username", user.getUsername());
         response.addProperty("full_name", user.getFullName());
-        response.addProperty("role", user.getRole());
+        response.addProperty("role", user.getRole().name());
 
         sendJson(resp, response);
     }
@@ -98,7 +98,7 @@ public class AuthRestController extends JsonRestController {
         response.addProperty("id", user.getId());
         response.addProperty("username", user.getUsername());
         response.addProperty("full_name", user.getFullName());
-        response.addProperty("role", user.getRole());
+        response.addProperty("role", user.getRole().name());
 
         sendJson(resp, response);
     }
