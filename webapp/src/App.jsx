@@ -195,18 +195,6 @@ function LoginPage({ onLogin }) {
   const handleGoogleLogin = async () => {
     setError('Google OAuth no disponible. Usa login con usuario y contraseña.')
   }
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      })
-      if (error) setError('Error con Google: ' + error.message)
-    } catch (err) {
-      setError('Error de conexión: ' + err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-800 to-green-600 flex items-center justify-center p-4">
