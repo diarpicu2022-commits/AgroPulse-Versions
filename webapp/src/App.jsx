@@ -1,5 +1,4 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import {
   Thermometer, Droplets, Leaf, Bell, Bot, Settings, LogOut,
@@ -7,21 +6,10 @@ import {
   CheckCircle, XCircle, Info, Key, Wifi, WifiOff,
   Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight
 } from 'lucide-react'
+import api from './services/api-client'
 
-// ── Supabase Client (desde variables de entorno) ─────────────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://lujulcpskvwpijpjpahk.supabase.co'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-
-const supabase = SUPABASE_ANON_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null
-
-// ── Safe Storage (fallback si no disponible) ────────────────
-const _memStore = {}
-const _ls = (() => { try { const s = window[['local','Storage'].join('')]; s.setItem('_t','1'); s.removeItem('_t'); return s } catch { return null } })()
-const safeGet = (k) => _ls ? _ls.getItem(k) : (_memStore[k] || null)
-const safeSet = (k, v) => _ls ? _ls.setItem(k, v) : (_memStore[k] = v)
-const safeRemove = (k) => _ls ? _ls.removeItem(k) : (delete _memStore[k])
+// ── API URL para REST (backend Java) ────────────────────────
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 // ── IA Services (Groq, GitHub, Ollama) ────────────────────────────────────────────────
 const getGroqKey = () => {
@@ -195,38 +183,18 @@ function LoginPage({ onLogin }) {
     setLoading(true)
     setError('')
     try {
-      if (!supabase) {
-        setError('Supabase no configurado. Revisa las variables de entorno.')
-        return
-      }
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', username)
-        .eq('active', 1)
-        .single()
-
-      if (error || !data) {
-        setError('Usuario no encontrado o inactivo.')
-        return
-      }
+      const data = await api.auth.login(username, password)
       onLogin(data)
     } catch (err) {
-      setError('Error de conexión: ' + err.message)
+      setError('Error: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleGoogleLogin = async () => {
-    if (!supabase) {
-      setError('Supabase no configurado. Revisa las variables de entorno.')
-      return
-    }
-    setLoading(true)
-    setError('')
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+    setError('Google OAuth no disponible. Usa login con usuario y contraseña.')
+  }
         provider: 'google',
         options: {
           redirectTo: window.location.origin
