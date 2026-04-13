@@ -4,14 +4,22 @@
  */
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+// ==================== DECLARACIONES ====================
+void connectWiFi();
+void readSensors();
+void sendSerial();
+void sendHTTP();
+void processCommand(String cmd);
+
 // ==================== CONFIGURACIÓN DE PINES ====================
-#define DHT22_INT_PIN     4    // DHT22 Interior
-#define DHT22_EXT_PIN    5    // DHT22 Exterior
-#define SOIL_SENSOR_PIN  36   // Sensor humedad suelo (A0)
+#define DHT11_INT_PIN     4     // DHT11 
+#define LM35_PIN          34    // LM35 (ADC)
+#define SOIL_SENSOR_PIN  35    // Sensor humedad suelo (ADC)
 
 // Actuadores
 #define RELAY_PUMP       12   // Bomba agua
@@ -25,11 +33,7 @@
 #define LED_SENSOR       26
 
 // ==================== SENSORES ====================
-DHT dhtInt(DHT22_INT_PIN, DHT22);
-DHT dhtExt(DHT22_EXT_PIN, DHT22);
-
-OneWire oneWire(18);  // DS18B20 en GPIO18
-DallasTemperature sensors(&oneWire);
+DHT dhtInt(DHT11_INT_PIN, DHT11);
 
 // ==================== VARIABLES GLOBALES ====================
 float tempIn = 0, tempOut = 0;
@@ -38,9 +42,9 @@ unsigned long lastRead = 0;
 const long interval = 5000;  // 5 segundos
 
 // WiFi
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-const char* serverIP = "192.168.1.100";
+const char* ssid = "MARCILLO";
+const char* password = "3188524275";
+const char* serverIP = "192.168.1.28";
 const int serverPort = 8765;
 
 WiFiClient client;
@@ -68,8 +72,7 @@ void setup() {
     
     // Iniciar sensores
     dhtInt.begin();
-    dhtExt.begin();
-    sensors.begin();
+    dhtInt.begin();
     
     // LED inicio
     digitalWrite(LED_STATUS, HIGH);
@@ -119,12 +122,13 @@ void connectWiFi() {
 }
 
 void readSensors() {
-    // Temperatura y humedad interna (DHT22 #1)
+    // Temperatura DHT11
     tempIn = dhtInt.readTemperature();
     humidity = dhtInt.readHumidity();
     
-    // Temperatura externa (DHT22 #2)
-    tempOut = dhtExt.readTemperature();
+    // Temperatura LM35 (analógico)
+    int lm35Raw = analogRead(LM35_PIN);
+    tempOut = (lm35Raw * 330.0) / 4095.0;  // Conversión a °C
     
     // Humedad del suelo (analógico)
     int soilRaw = analogRead(SOIL_SENSOR_PIN);
@@ -136,8 +140,8 @@ void readSensors() {
     delay(50);
     digitalWrite(LED_SENSOR, LOW);
     
-    Serial.printf("Lectura: TI=%.1f TE=%.1f Hum=%.1f Suelo=%d%%\n", 
-                 tempIn, tempOut, humidity, (int)soilMoisture);
+    Serial.printf("Lectura: DHT11=%.1f°C Hum=%d%% LM35=%.1f°C Suelo=%d%%\n", 
+                 tempIn, (int)humidity, tempOut, (int)soilMoisture);
 }
 
 void sendSerial() {

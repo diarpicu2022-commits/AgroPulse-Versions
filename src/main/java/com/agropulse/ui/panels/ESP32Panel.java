@@ -251,6 +251,15 @@ public class ESP32Panel extends javax.swing.JPanel {
             boolean ok = serialService.connect();
             if (ok) {
                 esp32Manager.addSource(serialService);
+                
+                // Auto-iniciar sondeo si no está activo
+                if (!esp32Manager.isPolling()) {
+                    int interval = (int) spnInterval.getValue();
+                    esp32Manager.startPolling(interval);
+                    tglPolling.setText("⏹ Detener Sondeo");
+                    tglPolling.setSelected(true);
+                }
+                
                 appendLog("✅ Serial conectado: " + port);
                 tglSerial.setText("🔌 Desconectar Serial");
             } else {
@@ -300,6 +309,15 @@ public class ESP32Panel extends javax.swing.JPanel {
             boolean ok = wifiService.connect();
             if (ok) {
                 esp32Manager.addSource(wifiService);
+                
+                // Auto-iniciar sondeo si no está activo
+                if (!esp32Manager.isPolling()) {
+                    int interval = (int) spnInterval.getValue();
+                    esp32Manager.startPolling(interval);
+                    tglPolling.setText("⏹ Detener Sondeo");
+                    tglPolling.setSelected(true);
+                }
+                
                 appendLog("✅ Servidor HTTP iniciado en puerto " + port);
                 appendLog("   ESP32 envía POST a: http://[IP_PC]:" + port + "/data");
                 tglWifi.setText("🌐 Detener Servidor HTTP");
