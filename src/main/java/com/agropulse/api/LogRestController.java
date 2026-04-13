@@ -31,7 +31,7 @@ public class LogRestController extends JsonRestController {
         String limitParam = req.getParameter("limit");
         int limit = limitParam != null ? Integer.parseInt(limitParam) : 100;
         
-        List<SystemLog> list = logDao.findRecent(limit);
+        List<SystemLog> list = logDao.findAll();
         
         JsonArray arr = new JsonArray();
         for (SystemLog l : list) arr.add(logToJson(l));

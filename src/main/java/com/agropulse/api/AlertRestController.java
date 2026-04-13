@@ -2,6 +2,7 @@ package com.agropulse.api;
 
 import com.agropulse.dao.AlertDao;
 import com.agropulse.model.Alert;
+import com.agropulse.model.enums.AlertLevel;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -46,9 +47,10 @@ public class AlertRestController extends JsonRestController {
 
     private void createAlert(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         JsonObject body = parseBody(req);
+        AlertLevel level = AlertLevel.valueOf(body.get("level").getAsString());
         Alert a = new Alert(
             body.get("message").getAsString(),
-            body.get("level").getAsString()
+            level
         );
         alertDao.save(a);
         sendJson(resp, alertToJson(a));
@@ -67,7 +69,7 @@ public class AlertRestController extends JsonRestController {
         JsonObject json = new JsonObject();
         json.addProperty("id", a.getId());
         json.addProperty("message", a.getMessage());
-        json.addProperty("level", a.getLevel());
+        json.addProperty("level", a.getLevel().name());
         json.addProperty("sent", a.isSent());
         json.addProperty("createdAt", a.getCreatedAt().toString());
         return json;

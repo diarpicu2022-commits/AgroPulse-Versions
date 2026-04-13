@@ -2,7 +2,7 @@ package com.agropulse.api;
 
 import com.agropulse.dao.UserDao;
 import com.agropulse.model.User;
-import com.agropulse.model.UserRole;
+import com.agropulse.model.enums.UserRole;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;

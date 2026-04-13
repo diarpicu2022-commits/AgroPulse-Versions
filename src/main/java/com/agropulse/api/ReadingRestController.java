@@ -39,7 +39,7 @@ public class ReadingRestController extends JsonRestController {
             int sensorId = Integer.parseInt(sensorParam);
             list = readingDao.findBySensorId(sensorId, limit);
         } else {
-            list = readingDao.findAll(limit);
+            list = readingDao.findAll();
         }
         
         JsonArray arr = new JsonArray();
