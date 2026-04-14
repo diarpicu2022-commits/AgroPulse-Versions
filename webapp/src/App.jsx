@@ -1539,17 +1539,30 @@ export default function App() {
 
   if (!user) return <LoginPage onLogin={handleLogin} />
 
-  const navItems = [
-    { id: 'dashboard', label: 'Inicio',      icon: Home },
-    { id: 'sensors',   label: 'Sensores',    icon: Activity },
-    { id: 'actuators', label: 'Actuadores',  icon: Zap },
-    { id: 'crops',     label: 'Cultivos',    icon: Leaf },
+  const userRole = user.role || user.user_metadata?.role || 'user'
+  const isAdmin = userRole === 'ADMIN' || userRole === 'admin' || user.email === 'diarpicu2022@gmail.com' || user.email === 'diarpicu2025@gmail.com' || user.email?.includes('admin')
+
+  const navItems = isAdmin ? [
+    { id: 'dashboard', label: 'Inicio',       icon: Home },
+    { id: 'sensors',    label: 'Sensores',     icon: Activity },
+    { id: 'actuators', label: 'Actuadores',   icon: Zap },
+    { id: 'greenhouses',label: 'Invernadero', icon: Sprout },
+    { id: 'crops',     label: 'Cultivos',     icon: Leaf },
     { id: 'simulate',  label: 'Simular',     icon: RefreshCw },
-    { id: 'ai',        label: 'IA',          icon: Bot },
-    { id: 'ml',        label: 'ML',          icon: Cpu },
-    { id: 'alerts',    label: 'Alertas',     icon: Bell },
-    { id: 'support',   label: 'Soporte',     icon: MessageCircle },
-    { id: 'settings',  label: 'Config',      icon: Settings },
+    { id: 'ai',       label: 'IA',         icon: Bot },
+    { id: 'ml',       label: 'ML',         icon: Cpu },
+    { id: 'alerts',   label: 'Alertas',     icon: Bell },
+    { id: 'logs',     label: 'Logs',        icon: Activity },
+    { id: 'users',    label: 'Usuarios',   icon: Key },
+    { id: 'support',  label: 'Soporte',    icon: MessageCircle },
+    { id: 'settings', label: 'Config',     icon: Settings },
+  ] : [
+    { id: 'dashboard', label: 'Inicio',    icon: Home },
+    { id: 'sensors',   label: 'Sensores',  icon: Activity },
+    { id: 'actuators', label: 'Actuadores',icon: Zap },
+    { id: 'crops',     label: 'Cultivos',  icon: Leaf },
+    { id: 'alerts',   label: 'Alertas',  icon: Bell },
+    { id: 'support',  label: 'Soporte',  icon: MessageCircle },
   ]
 
   const navigate = (id) => {
@@ -1559,18 +1572,18 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, logout: handleLogout }}>
-      <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative">
+      <div className="min-h-screen bg-gray-50 lg:max-w-full mx-auto relative">
 
         {/* Sidebar Overlay */}
         {sidebarOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-30 max-w-md mx-auto"
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
             onClick={() => setSidebarOpen(false)} />
         )}
 
         {/* Sidebar Menu */}
         <div className={`fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`} style={{ maxWidth: 'calc((100vw - 0px) / 2 + 144px)' }}>
+        } lg:w-64 lg:translate-x-0 lg:static lg:shadow-none`}>
           {/* Sidebar Header */}
           <div className="bg-green-700 text-white px-5 py-4 flex items-center justify-between">
             <div>
@@ -1634,16 +1647,20 @@ export default function App() {
         </header>
 
         {/* Contenido */}
-        <main className="px-4 py-4 pb-6">
-          {page === 'dashboard' && <Dashboard />}
-          {page === 'sensors'   && <SensorsPage />}
-          {page === 'actuators' && <ActuatorsPage />}
-          {page === 'crops'     && <CropsPage />}
-          {page === 'simulate'  && <SimulationPage />}
-          {page === 'ai'        && <AIPage />}
+        <main className="px-4 py-4 pb-6 lg:px-8">
+          {page === 'dashboard'   && <Dashboard />}
+          {page === 'sensors'    && <SensorsPage />}
+          {page === 'actuators'  && <ActuatorsPage />}
+          {page === 'greenhouses'&& <GreenhousePage />}
+          {page === 'crops'      && <CropsPage />}
+          {page === 'simulate'   && <SimulationPage />}
+          {page === 'ai'         && <AIPage />}
           {page === 'ml'        && <MLPage />}
           {page === 'alerts'    && <AlertsPage />}
-          {page === 'support'   && <SupportPage />}
+          {page === 'logs'       && <LogsPage />}
+          {page === 'users'      && <UsersPage />}
+          {page === 'support'    && <SupportPage />}
+          {page === 'settings'   && <SettingsPage />}
           {page === 'settings'  && <SettingsPage />}
         </main>
       </div>
