@@ -17,7 +17,7 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 // ── API URL para REST (backend Java) ────────────────────────
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
-// ── IA Services (Groq, GitHub, Ollama) ────────────────────────────────────────────────
+// ── IA Services (Groq, GitHub, Gemma) ────────────────────────────────────────────
 const getGroqKey = () => {
   return safeGet('agropulse_groq_key')
     || import.meta.env.VITE_GROQ_KEY
@@ -30,9 +30,9 @@ const getGitHubToken = () => {
     || ''
 }
 
-const getOpenRouterKey = () => {
-  return safeGet('agropulse_openrouter_key')
-    || import.meta.env.VITE_OPENROUTER_KEY
+const getGemmaKey = () => {
+  return safeGet('agropulse_gemma_key')
+    || import.meta.env.VITE_GEMMA_KEY
     || ''
 }
 
@@ -100,30 +100,35 @@ ${sensorContext ? `\nDatos actuales del invernadero:\n${sensorContext}` : ''}`
     }
   }
 
-  // Intentar Ollama (local)
-  try {
-    const ollamaHost = import.meta.env.VITE_OLLAMA_HOST || 'http://localhost:11434'
-    const res = await fetch(`${ollamaHost}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama3.1',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        stream: false
+  // Intentar Gemma 4 (Google AI Studio)
+  const gemmaKey = getGemmaKey()
+  if (gemmaKey) {
+    try {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?key=' + gemmaKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemma-4-31b-it',
+          messages: [
+            { role: 'user', content: systemPrompt + '\n\nPregunta: ' + prompt }
+          ],
+          max_tokens: 600,
+          temperature: 0.7
+        })
       })
-    })
-    const data = await res.json()
-    if (data.message && data.message.content) {
-      return data.message.content
+      const data = await res.json()
+      if (data.choices && data.choices[0]) {
+        return data.choices[0].message.content
+      }
+      if (data.error) {
+        console.error('Gemma error:', data.error.message)
+      }
+    } catch (err) {
+      console.error('Gemma error:', err)
     }
-  } catch (err) {
-    console.error('Ollama error:', err)
   }
 
-  return '⚠️ No hay servicio de IA disponible. Configura Groq o GitHub en Configuración.'
+  return '⚠️ No hay servicio de IA disponible. Configura Groq, GitHub o Gemma en Configuración.'
 }
 
 // ── Contexto de autenticación ────────────────────────────────────
@@ -1359,21 +1364,29 @@ function SupportPage() {
 
 // ── Página de Configuración ──────────────────────────────────────
 function SettingsPage() {
-  const [orKey, setOrKey]           = useState(safeGet('agropulse_openrouter_key') || '')
+  const [groqKey, setGroqKey]       = useState(safeGet('agropulse_groq_key') || '')
+  const [githubKey, setGithubKey]   = useState(safeGet('agropulse_github_token') || '')
+  const [gemmaKey, setGemmaKey]     = useState(safeGet('agropulse_gemma_key') || '')
   const [saved, setSaved]           = useState(false)
 
-  const saveKey = () => {
-    if (orKey.trim()) {
-      safeSet('agropulse_openrouter_key', orKey.trim())
-    } else {
-      safeRemove('agropulse_openrouter_key')
-    }
+  const saveKeys = () => {
+    if (groqKey.trim()) safeSet('agropulse_groq_key', groqKey.trim())
+    else safeRemove('agropulse_groq_key')
+    
+    if (githubKey.trim()) safeSet('agropulse_github_token', githubKey.trim())
+    else safeRemove('agropulse_github_token')
+    
+    if (gemmaKey.trim()) safeSet('agropulse_gemma_key', gemmaKey.trim())
+    else safeRemove('agropulse_gemma_key')
+    
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const hasEnvKey = !!import.meta.env.VITE_OPENROUTER_KEY
-  const activeKey = getOpenRouterKey()
+  const groqActive = getGroqKey()
+  const githubActive = getGitHubToken()
+  const gemmaActive = getGemmaKey()
+  const activeCount = [groqActive, githubActive, gemmaActive].filter(Boolean).length
 
   return (
     <div className="space-y-4">
@@ -1391,11 +1404,11 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Build</span>
-            <span className="font-medium text-gray-800">2025.03</span>
+            <span className="font-medium text-gray-800">2025.04</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">WebApp</span>
-            <span className="font-medium text-gray-800">React + Vite</span>
+            <span className="text-gray-500">IAs Activas</span>
+            <span className="font-medium text-green-600">{activeCount} de 3</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Usuario</span>
@@ -1403,7 +1416,7 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Rol</span>
-            <span className="font-medium text-gray-800">{user?.role || 'OPERATOR'}</span>
+            <span className="font-medium text-gray-800">{user?.role || 'USER'}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500">Supabase</span>
@@ -1414,42 +1427,81 @@ function SettingsPage() {
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-gray-500">IA (OpenRouter)</span>
+            <span className="text-gray-500">IA Activas</span>
             <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-              activeKey ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+              activeCount > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
             }`}>
-              {activeKey ? <><CheckCircle size={12} /> Configurada</> : <><XCircle size={12} /> Sin clave</>}
+              {activeCount > 0 ? <><CheckCircle size={12} /> {activeCount} configuradas</> : <><XCircle size={12} /> Sin configurar</>}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Configurar API Key */}
+      {/* Configurar 3 IAs */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
-          <Key size={14} className="inline mr-1" /> Clave de IA (OpenRouter)
+          <Key size={14} className="inline mr-1" /> Inteligencias Artificiales
         </h3>
         <p className="text-xs text-gray-500 mb-3">
-          Obtén tu clave gratuita en <span className="font-semibold">openrouter.ai</span> → Sign up → API Keys.
-          Incluye acceso a Gemini 2.0 Flash y LLaMA-70B gratis.
+          Configura las IAs que quieres usar en la aplicación.
         </p>
-        {hasEnvKey && (
-          <p className="text-xs text-green-600 mb-2">
-            ✅ Se detectó una clave en las variables de entorno (.env).
-          </p>
-        )}
-        <input
-          type="password"
-          value={orKey}
-          onChange={e => setOrKey(e.target.value)}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          placeholder="sk-or-v1-..."
-        />
+
+        {/* Groq */}
+        <div className="mb-4 p-3 border border-gray-100 rounded-xl">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-medium">⚡ Groq (LLaMA-3.3-70B)</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${groqActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {groqActive ? 'Activa' : 'No configurada'}
+            </span>
+          </div>
+          <input
+            type="password"
+            value={groqKey}
+            onChange={e => setGroqKey(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-xs"
+            placeholder="gsk_..."
+          />
+        </div>
+
+        {/* GitHub */}
+        <div className="mb-4 p-3 border border-gray-100 rounded-xl">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-medium">🐙 GitHub (phi-4-mini)</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${githubActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {githubActive ? 'Activa' : 'No configurada'}
+            </span>
+          </div>
+          <input
+            type="password"
+            value={githubKey}
+            onChange={e => setGithubKey(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-xs"
+            placeholder="ghp_... (GitHub PAT)"
+          />
+        </div>
+
+        {/* Gemma */}
+        <div className="mb-4 p-3 border border-gray-100 rounded-xl">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-medium">🧠 Gemma 4 (Google AI)</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${gemmaActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {gemmaActive ? 'Activa' : 'No configurada'}
+            </span>
+          </div>
+          <input
+            type="password"
+            value={gemmaKey}
+            onChange={e => setGemmaKey(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-xs"
+            placeholder="AIza... (Google AI Studio)"
+          />
+        </div>
+
         <button
-          onClick={saveKey}
-          className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl text-sm font-medium transition-colors"
+          onClick={saveKeys}
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-xl text-sm font-medium transition-colors"
         >
-          {saved ? '✅ Guardada' : '💾 Guardar clave'}
+          {saved ? '✅ Todas guardadas' : '💾 Guardar todas las claves'}
         </button>
       </div>
 

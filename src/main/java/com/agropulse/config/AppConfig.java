@@ -173,6 +173,11 @@ public class AppConfig {
     public void setGithubEnabled(boolean v) { setGitHubEnabled(v); }
     public boolean isGithubEnabled() { return isGitHubEnabled(); }
 
+    // ─── Gemma 4 (Google AI Studio) ───────────────────────────────
+    public String getGemmaKey() { return get("gemma_api_key"); }
+    public boolean isGemmaEnabled() { return "true".equals(get("gemma_enabled")); }
+    public void setGemmaEnabled(boolean v) { set("gemma_enabled", String.valueOf(v)); }
+
     // ─── Mistral ────────────────────────────────────────────────────
     public String getMistralKey()              { return get("mistral_api_key"); }
     public boolean isMistralEnabled()          { return "true".equals(get("mistral_enabled")); }
@@ -180,13 +185,14 @@ public class AppConfig {
 
     // ─── Estado global de IA ─────────────────────────────────────────
     public boolean isAIEnabled() {
-        return isGroqEnabled() || isOllamaEnabled() || isGitHubEnabled();
+        return isGroqEnabled() || isOllamaEnabled() || isGitHubEnabled() || isGemmaEnabled();
     }
 
     public void setAIEnabled(boolean enabled) {
         setGroqEnabled(enabled);
         setOllamaEnabled(enabled);
         setGitHubEnabled(enabled);
+        setGemmaEnabled(enabled);
     }
 
     // ─── WhatsApp ────────────────────────────────────────────────────

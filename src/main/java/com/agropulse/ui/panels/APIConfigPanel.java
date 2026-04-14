@@ -87,6 +87,7 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         pnlTop.setBackground(AppTheme.BG_MAIN);
         pnlTop.add(buildGroqCard());
         pnlTop.add(buildGithubCard());
+        pnlTop.add(buildGemmaCard());
         pnlTop.add(buildOllamaCard());
 
         // Fila inferior: WhatsApp
@@ -207,6 +208,41 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
         return card;
     }
 
+    private JPanel buildGemmaCard() {
+        JPanel card = card();
+        txtGemmaKey = pwd();
+        tglGemma    = toggle("Gemma 4", cfg.isGemmaEnabled());
+        hookToggle(tglGemma);
+
+        JLabel hint = new JLabel(
+            "<html><div style='font-family:Segoe UI Emoji'><small>✅ <b>Gratis con credits mensuales.</b><br>" +
+            "1. Ir a <b>aistudio.google.com/app/apikey</b><br>" +
+            "2. Crear API Key<br>" +
+            "3. Usar gemma-4-31b-it</small></div></html>");
+        hint.setFont(AppTheme.FONT_SMALL);
+        hint.setForeground(new Color(0x1B5E20));
+        hint.setAlignmentX(LEFT_ALIGNMENT);
+
+        JButton btn = saveBtn("💾 Guardar Gemma", () -> {
+            cfg.set("gemma_api_key", new String(txtGemmaKey.getPassword()));
+            cfg.setGemmaEnabled(tglGemma.isSelected());
+            controller.refreshAIServices();
+            log("CONFIG_API", "Gemma guardado");
+            ok("✅ Gemma 4 guardado.");
+        });
+
+        card.add(sectionLabel("🧠 Gemma 4 (Google AI Studio)"));
+        card.add(Box.createVerticalStrut(6));
+        card.add(hint);
+        card.add(Box.createVerticalStrut(8));
+        card.add(row("API Key (AIza...)", txtGemmaKey));
+        card.add(tglGemma);
+        card.add(Box.createVerticalStrut(8));
+        card.add(btn);
+        card.add(Box.createVerticalGlue());
+        return card;
+    }
+
     private JPanel buildWhatsAppCard() {
         JPanel card = card();
         txtGreenUrl   = fld();
@@ -242,6 +278,9 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
 
         if (txtGithubKey != null) txtGithubKey.setText(cfg.getGithubKey());
         if (tglGithub    != null) { tglGithub.setSelected(cfg.isGithubEnabled()); syncToggle(tglGithub); }
+
+        if (txtGemmaKey != null) txtGemmaKey.setText(cfg.getGemmaKey());
+        if (tglGemma    != null) { tglGemma.setSelected(cfg.isGemmaEnabled()); syncToggle(tglGemma); }
 
         if (txtOllamaHost  != null) txtOllamaHost.setText(cfg.getOllamaHost());
         if (txtOllamaModel != null) txtOllamaModel.setText(cfg.getOllamaModel());
@@ -374,6 +413,7 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
     private javax.swing.JLabel         lblTitle;
     private javax.swing.JPasswordField txtGroqKey;
     private javax.swing.JPasswordField txtGithubKey;
+    private javax.swing.JPasswordField txtGemmaKey;
     private javax.swing.JPasswordField txtGreenToken;
     private javax.swing.JTextField     txtOllamaHost;
     private javax.swing.JTextField     txtOllamaModel;
@@ -382,6 +422,7 @@ public class APIConfigPanel extends javax.swing.JPanel implements Refreshable {
     private javax.swing.JTextField     txtAlertPhone;
     private javax.swing.JToggleButton  tglGroq;
     private javax.swing.JToggleButton  tglGithub;
+    private javax.swing.JToggleButton  tglGemma;
     private javax.swing.JToggleButton  tglOllama;
     private javax.swing.JToggleButton  tglWA;
 }

@@ -72,14 +72,16 @@ public class GreenhouseController {
     private void initializeServices() {
         // Solo IAs gratuitas sin tarjeta
         GroqService   groq    = new GroqService(config.getGroqKey());
-        OllamaService ollama = new OllamaService(config.getOllamaHost(), config.getOllamaModel());
         GitHubModelsService github = new GitHubModelsService(config.getGitHubToken());
+        GemmaService  gemma  = new GemmaService(config.getGemmaKey());
+        OllamaService ollama = new OllamaService(config.getOllamaHost(), config.getOllamaModel());
 
         groq.setEnabled(config.isGroqEnabled());
-        ollama.setEnabled(config.isOllamaEnabled());
         github.setEnabled(config.isGitHubEnabled());
+        gemma.setEnabled(config.isGemmaEnabled());
+        ollama.setEnabled(config.isOllamaEnabled());
 
-        this.multiAIService = new MultiAIService(groq, ollama, github);
+        this.multiAIService = new MultiAIService(groq, github, gemma, ollama);
 
         this.whatsAppService = new GreenAPIWhatsAppService(
                 config.getGreenApiUrl(),

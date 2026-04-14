@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
  *   ✅ Groq (LLaMA3 ultra-rápido)
  *   ✅ Ollama (modelos locales)
  *   ✅ GitHub Models (phi-4-mini, gratis)
+ *   ✅ Gemma 4 (Google AI Studio)
  */
 public class MultiAIService implements AIService {
 
@@ -29,13 +30,19 @@ public class MultiAIService implements AIService {
     // Timeout por servicio (segundos) — Groq y Ollama son los extremos
     private static final int TIMEOUT_SECONDS = 60;
 
-    // Constructor con solo las 3 APIs funcionales
-    public MultiAIService(GroqService groq, OllamaService ollama, GitHubModelsService github) {
+    // Constructor con 4 APIs (Groq, GitHub, Gemma, Ollama)
+    public MultiAIService(GroqService groq, GitHubModelsService github, GemmaService gemma, OllamaService ollama) {
         if (groq    != null) services.put("⚡ Groq",       groq);
-        if (ollama != null) services.put("💻 Ollama",     ollama);
         if (github != null) services.put("🐙 GitHub",     github);
+        if (gemma  != null) services.put("🧠 Gemma",      gemma);
+        if (ollama != null) services.put("💻 Ollama",     ollama);
 
         this.executor = Executors.newFixedThreadPool(Math.max(services.size(), 1));
+    }
+
+    // Constructor legacy (para compatibilidad)
+    public MultiAIService(GroqService groq, OllamaService ollama, GitHubModelsService github) {
+        this(groq, github, null, ollama);
     }
 
     // ─── AIService interface ──────────────────────────────────────────
