@@ -367,7 +367,7 @@ function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-800">
-            Hola, {user?.full_name || user?.username} 👋
+            Hola, Usuario 👋
           </h2>
           <p className="text-sm text-gray-500">
             {crop ? `🌿 Cultivo activo: ${crop.name}` : 'Sin cultivo activo'}
@@ -1045,151 +1045,54 @@ function AIPage() {
   const [prompt, setPrompt]       = useState('')
   const [response, setResponse]   = useState('')
   const [loading, setLoading]     = useState(false)
-  const [readings, setReadings]   = useState([])
 
-  useEffect(() => {
-    loadLatestReadings()
-  }, [])
-
-  const loadLatestReadings = async () => {
-    try {
-      const data = await api.readings.list(1, 20)
-      setReadings(data.readings || [])
-    } catch (err) {
-      console.error('Error cargando lecturas:', err)
-      setReadings([])
-    }
-  }
-
-  const buildSensorContext = () => {
-    if (readings.length === 0) return ''
-    const byType = {}
-    readings.forEach(r => {
-      if (!byType[r.sensor_type]) byType[r.sensor_type] = r
-    })
-    let ctx = 'Lecturas actuales de sensores:\n'
-    for (const [type, r] of Object.entries(byType)) {
-      ctx += `- ${type}: ${r.value.toFixed(1)} (${new Date(r.timestamp).toLocaleTimeString('es-CO')})\n`
-    }
-    return ctx
-  }
-
-  const sendPrompt = async (text) => {
-    const question = text || prompt
-    if (!question.trim()) return
+  const sendToAI = async () => {
+    if (!prompt.trim()) return
     setLoading(true)
-    setResponse('')
-    const result = await callAI(question, buildSensorContext())
-    setResponse(result)
+    try {
+      const result = await callAI(prompt, '')
+      setResponse(result)
+    } catch (err) {
+      setResponse('Error: ' + err.message)
+    }
     setLoading(false)
   }
 
-  const presets = [
-    { label: '📊 Analizar estado', prompt: 'Analiza el estado actual del invernadero basándote en las lecturas de sensores. Identifica problemas y sugiere acciones correctivas.' },
-    { label: '🌱 Recomendar cultivo', prompt: 'Dame recomendaciones para mejorar el cuidado del cultivo actual basándote en las condiciones del invernadero.' },
-    { label: '⚙️ Predecir actuadores', prompt: 'Basándote en las lecturas actuales, predice qué actuadores será necesario activar en las próximas horas y por qué.' },
-  ]
-
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800">🤖 Consultar IA</h2>
-
-      {/* Estado de conexión */}
-      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl ${
-        getOpenRouterKey() ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-      }`}>
-        {getOpenRouterKey() ? (
-          <><CheckCircle size={14} /> IA conectada (OpenRouter - Gemini Experimental Gratis)</>
-        ) : (
-          <><XCircle size={14} /> Sin clave de IA. Ve a Configuración para ingresarla.</>
-        )}
-      </div>
-
-      {/* Botones predefinidos */}
-      <div className="grid grid-cols-3 gap-2">
-        {presets.map((p, i) => (
-          <button key={i}
-            onClick={() => sendPrompt(p.prompt)}
-            disabled={loading}
-            className="bg-white border border-gray-200 hover:border-green-400 hover:bg-green-50 rounded-xl p-3 text-xs font-medium text-gray-700 transition-all disabled:opacity-50"
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Prompt libre */}
+      <h2 className="text-xl font-bold text-gray-800">🤖 AgroPulse IA</h2>
+      
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <p className="text-sm text-gray-600 mb-4">
+          Consulta a la inteligencia artificial sobre tu invernadero.
+        </p>
         <textarea
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
+          placeholder="¿Qué quieres saber?"
+          className="w-full border rounded-xl px-3 py-2 text-sm"
           rows={3}
-          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-          placeholder="Escribe tu pregunta sobre el invernadero..."
         />
         <button
-          onClick={() => sendPrompt()}
+          onClick={sendToAI}
           disabled={loading || !prompt.trim()}
-          className="mt-2 w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          className="mt-2 w-full bg-green-600 text-white py-2 rounded-xl font-medium disabled:opacity-50"
         >
-          {loading ? (
-            <><div className="animate-spin text-lg">🌿</div> Consultando IA...</>
-          ) : (
-            <><Send size={16} /> Enviar consulta</>
-          )}
+          {loading ? 'Consultando...' : '🤖 Preguntar'}
         </button>
       </div>
 
-      {/* Respuesta de la IA */}
-      {(response || loading) && (
+      {response && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 bg-green-100 rounded-lg">
-              <Bot size={16} className="text-green-700" />
-            </div>
-            <span className="text-sm font-semibold text-gray-700">Respuesta de AgroPulse IA</span>
-          </div>
-          {loading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="animate-spin text-xl">🌿</div>
-              Analizando datos del invernadero...
-            </div>
-          ) : (
-            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {response}
-            </div>
-          )}
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
         </div>
-      )}
-
-      {/* Info de contexto */}
-      {readings.length > 0 && (
-        <p className="text-xs text-gray-400 text-center">
-          La IA utiliza datos de {readings.length} lecturas recientes de sensores como contexto.
-        </p>
       )}
     </div>
   )
 }
 
-// ── Página ML Predicciones ───────────────────────────────────────
-function MLPage() {
-  const [prediction, setPrediction] = useState('')
-  const [loading, setLoading]       = useState(false)
-  const [readings, setReadings]     = useState([])
-
-  useEffect(() => { loadReadings() }, [])
-
-  const loadReadings = async () => {
-    try {
-      const data = await api.readings.list(1, 30)
-      setReadings(data.readings || [])
-    } catch (err) { 
-      console.error(err)
-      setReadings([])
-    }
-  }
-
+// ── Página de ML
+function MLPage_OLD() {
   const buildContext = () => {
     if (readings.length === 0) return ''
     const byType = {}
@@ -1288,23 +1191,6 @@ Sé conciso y práctico.`
 
 // ── Página de Tickets de Soporte ──────────────────────────────────
 function SupportPage() {
-  const [subject, setSubject] = useState('')
-  const [description, setDesc] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
-
-  const submitTicket = async (e) => {
-    e.preventDefault()
-    if (!subject.trim() || !description.trim()) return
-    setLoading(true)
-    setTimeout(() => {
-      setSubject(''); setDesc('')
-      setLoading(false)
-      setSent(true)
-      setTimeout(() => setSent(false), 3000)
-    }, 1000)
-  }
-
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
@@ -1412,11 +1298,11 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Usuario</span>
-            <span className="font-medium text-gray-800">{user?.full_name || user?.username}</span>
+            <span className="font-medium text-gray-800">Usuario</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Rol</span>
-            <span className="font-medium text-gray-800">{user?.role || 'USER'}</span>
+            <span className="font-medium text-gray-800">Usuario</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500">Supabase</span>
