@@ -1092,7 +1092,7 @@ function AIPage() {
 }
 
 // ── Página de ML
-function MLPage_OLD() {
+function MLPage() {
   const buildContext = () => {
     if (readings.length === 0) return ''
     const byType = {}
@@ -1195,54 +1195,24 @@ function SupportPage() {
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
 
-      {sent && (
-        <div className="bg-green-100 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
-          ✅ Mensaje enviado. Te contactaremos pronto.
-        </div>
-      )}
-
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <h3 className="font-semibold text-gray-700 mb-3">📩 Contactar Soporte</h3>
-        <form onSubmit={submitTicket} className="space-y-3">
-          <input
-            value={subject} onChange={e => setSubject(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-            placeholder="Asunto del problema..."
-          />
-          <textarea
-            value={description} onChange={e => setDesc(e.target.value)}
-            rows={3}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-            placeholder="Describe el problema en detalle..."
-          />
-          <button type="submit" disabled={loading}
-            className="w-full bg-green-600 text-white py-2 rounded-xl text-sm font-medium disabled:opacity-50">
-            {loading ? 'Enviando...' : '📨 Enviar Ticket'}
-          </button>
-        </form>
+        <h3 className="font-semibold text-gray-700 mb-3">📩 Contactar al Equipo</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          ¿Tienes problemas o sugerencias? Escríbenos a:
+        </p>
+        <a href="mailto:soporte@agropulse.com" 
+           className="block bg-green-600 text-white text-center py-3 rounded-xl font-medium hover:bg-green-700">
+          📧 soporte@agropulse.com
+        </a>
       </div>
 
-      <div className="space-y-3">
-        {tickets.map(t => (
-          <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm text-gray-800">{t.subject}</span>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[t.status] || 'bg-gray-100'}`}>
-                {t.status}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500">{t.description}</p>
-            {t.admin_response && (
-              <div className="mt-2 p-2 bg-green-50 rounded-xl">
-                <p className="text-xs font-medium text-green-700">Respuesta del admin:</p>
-                <p className="text-xs text-green-600">{t.admin_response}</p>
-              </div>
-            )}
-          </div>
-        ))}
-        {tickets.length === 0 && (
-          <p className="text-center text-gray-400 text-sm py-8">No tienes tickets aún.</p>
-        )}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <h3 className="font-semibold text-gray-700 mb-3">📋 Información del Sistema</h3>
+        <div className="space-y-2 text-sm text-gray-600">
+          <p>🌿 <strong>AgroPulse</strong></p>
+          <p>📅 Versión 6.0</p>
+          <p>🎓 Universidad Cooperativa de Colombia</p>
+        </div>
       </div>
     </div>
   )
