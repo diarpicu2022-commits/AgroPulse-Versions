@@ -1277,7 +1277,6 @@ Sé conciso y práctico.`
 
 // ── Página de Tickets de Soporte ──────────────────────────────────
 function SupportPage() {
-  const { user } = useAuth()
   const [subject, setSubject] = useState('')
   const [description, setDesc] = useState('')
   const [loading, setLoading] = useState(false)
@@ -1354,7 +1353,6 @@ function SupportPage() {
 
 // ── Página de Configuración ──────────────────────────────────────
 function SettingsPage() {
-  const { user, logout } = useAuth()
   const [orKey, setOrKey]           = useState(safeGet('agropulse_openrouter_key') || '')
   const [saved, setSaved]           = useState(false)
 
@@ -1578,9 +1576,6 @@ export default function App() {
 
   const handleLogin = (userData) => setUser(userData)
   const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut().catch(() => {})
-    }
     setUser(null)
     setPage('dashboard')
   }
@@ -1641,9 +1636,9 @@ export default function App() {
         )}
 
         {/* Sidebar Menu */}
-        <div className={`fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${
+        <div className={`fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:w-64 lg:translate-x-0 lg:static lg:shadow-none`}>
+        } lg:block lg:translate-x-0`}>
           {/* Sidebar Header */}
           <div className="bg-green-700 text-white px-5 py-4 flex items-center justify-between">
             <div>
@@ -1692,10 +1687,10 @@ export default function App() {
         </div>
 
         {/* Header */}
-        <header className="bg-green-700 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow">
+        <header className="bg-green-700 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow lg:ml-64">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)}
-              className="p-1.5 hover:bg-green-600 rounded-lg transition-colors">
+              className="p-1.5 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
               <Menu size={20} />
             </button>
             <span className="text-lg font-bold">🌿 AgroPulse</span>
@@ -1707,7 +1702,7 @@ export default function App() {
         </header>
 
         {/* Contenido */}
-        <main className="px-4 py-4 pb-6 lg:px-8">
+        <main className="px-4 py-4 pb-6 lg:px-8 lg:ml-64">
           {page === 'dashboard'   && <Dashboard />}
           {page === 'sensors'    && <SensorsPage />}
           {page === 'actuators'  && <ActuatorsPage />}
