@@ -192,8 +192,9 @@ function LoginPage({ onLogin }) {
       // Always use REST API first (Supabase is optional)
       const data = await api.auth.login(username, password)
       const email = data.username
-      const isAdmin = data.role === 'ADMIN' || email === 'admin' || email === 'diarpicu2022@gmail.com'
-      onLogin({ ...data, email: email, role: isAdmin ? 'admin' : 'user' })
+      // Use role directly from API - ADMIN gets admin panel, others get user panel
+      const role = (data.role === 'ADMIN') ? 'admin' : 'user'
+      onLogin({ ...data, email: email, role: role })
     } catch (err) {
       setError('Credenciales incorrectas')
     } finally {
@@ -1597,8 +1598,9 @@ export default function App() {
 
   if (!user) return <LoginPage onLogin={handleLogin} />
 
-  const userRole = user.role || user.user_metadata?.role || 'user'
-  const isAdmin = userRole === 'ADMIN' || userRole === 'admin' || user.email === 'diarpicu2022@gmail.com' || user.email === 'diarpicu2025@gmail.com' || user.email?.includes('admin')
+  // Use role directly from login response
+  const userRole = user.role || 'user'
+  const isAdmin = userRole === 'admin' || userRole === 'ADMIN'
 
   const navItems = isAdmin ? [
     { id: 'dashboard', label: 'Inicio',       icon: Home },
