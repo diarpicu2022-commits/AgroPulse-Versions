@@ -1661,9 +1661,204 @@ export default function App() {
           {page === 'users'      && <UsersPage />}
           {page === 'support'    && <SupportPage />}
           {page === 'settings'   && <SettingsPage />}
-          {page === 'settings'  && <SettingsPage />}
+          {page === 'greenhouses' && <GreenhousePage />}
         </main>
       </div>
     </AuthContext.Provider>
+  )
+}
+
+// ── Greenhouse Page ─────────────────────────────────────────
+function GreenhousePage() {
+  const [greenhouses, setGreenhouses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', location: '', description: '' })
+
+  useEffect(() => { loadGreenhouses() }, [])
+
+  const loadGreenhouses = async () => {
+    try {
+      const data = await api.greenhouses.list()
+      setGreenhouses(data.greenhouses || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await api.greenhouses.create(form)
+      setShowForm(false)
+      setForm({ name: '', location: '', description: '' })
+      loadGreenhouses()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const handleDelete = async (id) => {
+    if (confirm('¿Eliminar?')) {
+      try {
+        await api.greenhouses.delete(id)
+        loadGreenhouses()
+      } catch (err) { alert('Error: ' + err.message) }
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">🏡 Invernaderos</h2>
+        <button onClick={() => setShowForm(!showForm)} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700">
+          {showForm ? 'Cancelar' : '+ Nuevo'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+          <input type="text" placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" required />
+          <input type="text" placeholder="Ubicación" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" />
+          <textarea placeholder="Descripción" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" />
+          <button type="submit" className="w-full bg-primary text-white py-2 rounded-xl font-medium">Guardar</button>
+        </form>
+      )}
+
+      {loading ? <div className="text-center py-8">Cargando...</div> : greenhouses.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <p className="text-gray-500">No hay invernaderos</p>
+          <p className="text-sm text-gray-400 mt-1">Crea uno nuevo</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {greenhouses.map(g => (
+            <div key={g.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-800">{g.name}</h3>
+                  <p className="text-sm text-gray-500">{g.location}</p>
+                  <p className="text-xs text-gray-400 mt-1">{g.description}</p>
+                </div>
+                <button onClick={() => handleDelete(g.id)} className="text-red-500 text-sm">Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Logs Page ─────────────────────────────────────────────
+function LogsPage() {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadLogs() }, [])
+
+  const loadLogs = async () => {
+    try {
+      const data = await api.logs.list(50)
+      setLogs(data.logs || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-gray-800">📋 Logs del Sistema</h2>
+      {loading ? <div className="text-center py-8">Cargando...</div> : logs.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <p className="text-gray-500">No hay logs</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y max-h-96 overflow-y-auto">
+          {logs.map(l => (
+            <div key={l.id} className="p-3 text-sm">
+              <span className="text-gray-400 text-xs">{l.timestamp}</span>
+              <p className="text-gray-800"><span className="font-medium">{l.action}</span>: {l.details}</p>
+              <p className="text-gray-400 text-xs">Por: {l.performedBy}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Users Page ────────────────────────────────────────────
+function UsersPage() {
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ username: '', password: '', fullName: '', role: 'USER' })
+
+  useEffect(() => { loadUsers() }, [])
+
+  const loadUsers = async () => {
+    try {
+      const data = await api.users.list()
+      setUsers(data.users || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await api.users.create(form)
+      setShowForm(false)
+      setForm({ username: '', password: '', fullName: '', role: 'USER' })
+      loadUsers()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const handleDelete = async (id) => {
+    if (confirm('¿Eliminar usuario?')) {
+      try {
+        await api.users.delete(id)
+        loadUsers()
+      } catch (err) { alert('Error: ' + err.message) }
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-800">👥 Usuarios</h2>
+        <button onClick={() => setShowForm(!showForm)} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium">
+          {showForm ? 'Cancelar' : '+ Nuevo'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+          <input type="text" placeholder="Usuario" value={form.username} onChange={e => setForm({...form, username: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" required />
+          <input type="password" placeholder="Contraseña" value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" required />
+          <input type="text" placeholder="Nombre completo" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" />
+          <select value={form.role} onChange={e => setForm({...form, role: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm">
+            <option value="USER">Usuario</option>
+            <option value="ADMIN">Administrador</option>
+            <option value="OPERATOR">Operador</option>
+          </select>
+          <button type="submit" className="w-full bg-primary text-white py-2 rounded-xl font-medium">Crear Usuario</button>
+        </form>
+      )}
+
+      {loading ? <div className="text-center py-8">Cargando...</div> : (
+        <div className="grid gap-3">
+          {users.map(u => (
+            <div key={u.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-800">{u.username}</h3>
+                  <p className="text-sm text-gray-500">{u.fullName}</p>
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">{u.role}</span>
+                </div>
+                <button onClick={() => handleDelete(u.id)} className="text-red-500 text-sm">Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
