@@ -199,7 +199,21 @@ function LoginPage({ onLogin }) {
   }
 
   const handleGoogleLogin = async () => {
-    setError('Google OAuth no disponible. Usa login con usuario y contraseña.')
+    if (!supabase) {
+      setError('Supabase no configurado. Usa login con usuario y contraseña.')
+      return
+    }
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      })
+      if (error) setError('Error con Google: ' + error.message)
+    } catch (err) {
+      setError('Error de conexión: ' + err.message)
+    }
   }
 
   return (
