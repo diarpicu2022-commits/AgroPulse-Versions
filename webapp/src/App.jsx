@@ -560,10 +560,6 @@ function SensorsPage() {
     </div>
   )
 }
-      </p>
-    </div>
-  )
-}
 
 // ── Página de Actuadores ─────────────────────────────────────────
 function ActuatorsPage() {
