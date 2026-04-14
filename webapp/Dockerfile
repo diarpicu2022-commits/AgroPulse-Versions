@@ -23,6 +23,8 @@ COPY webapp/.env* ./
 
 # Variables de entorno para producción
 ENV VITE_API_URL=https://agropulse-versions-production.up.railway.app
+ENV VITE_SUPABASE_URL=https://xyzuwzabefghijklmno.supabase.co
+ENV VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ENV NODE_ENV=production
 
 # Build de producción
