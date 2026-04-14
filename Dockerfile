@@ -30,8 +30,9 @@ LABEL description="AgroPulse - Sistema de Monitoreo de Invernadero"
 
 WORKDIR /app
 
-# Copiar JAR desde stage de build
+# Copiar JAR y DB desde stage de build
 COPY --from=build /app/target/AgroPulse-2.0.0.jar app.jar
+COPY --from=build /app/agropulse.db /app/agropulse.db
 
 # Exponer puerto REST API
 EXPOSE 8080
