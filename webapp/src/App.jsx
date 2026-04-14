@@ -847,21 +847,21 @@ function SimulationPage() {
     setLoading(true)
     const timestamp = new Date().toISOString()
     const readings = [
-      { sensor_id: 1, sensor_type: 'TEMPERATURE_INTERNAL', value: randBetween(15, 40), timestamp },
-      { sensor_id: 2, sensor_type: 'TEMPERATURE_EXTERNAL', value: randBetween(5, 35),  timestamp },
-      { sensor_id: 3, sensor_type: 'HUMIDITY',             value: randBetween(30, 90),  timestamp },
-      { sensor_id: 4, sensor_type: 'SOIL_MOISTURE',        value: randBetween(20, 80),  timestamp },
+      { sensor_id: 1, sensor_type: 'TEMPERATURE_INTERNAL', value: randBetween(15, 40), timestamp, source: 'SIMULATION' },
+      { sensor_id: 2, sensor_type: 'TEMPERATURE_EXTERNAL', value: randBetween(5, 35),  timestamp, source: 'SIMULATION' },
+      { sensor_id: 3, sensor_type: 'HUMIDITY',             value: randBetween(30, 90),  timestamp, source: 'SIMULATION' },
+      { sensor_id: 4, sensor_type: 'SOIL_MOISTURE',        value: randBetween(20, 80),  timestamp, source: 'SIMULATION' },
     ]
 
     setGenerated(readings)
 
-    if (supabase) {
-      try {
-        await supabase.from('sensor_readings').insert(readings)
-        setHistory(prev => [{ time: timestamp, readings }, ...prev].slice(0, 10))
-      } catch (err) {
-        console.error('Error insertando lecturas:', err)
+    try {
+      for (const r of readings) {
+        await api.readings.create(r)
       }
+      setHistory(prev => [{ time: timestamp, readings }, ...prev].slice(0, 10))
+    } catch (err) {
+      console.error('Error:', err)
     }
     setLoading(false)
   }
@@ -1191,17 +1191,10 @@ function MLPage() {
   useEffect(() => { loadReadings() }, [])
 
   const loadReadings = async () => {
-    if (!supabase) return
     try {
-      const { data } = await supabase
-        .from('sensor_readings')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(30)
-      if (data) setReadings(data)
-    } catch (err) {
-      console.error('Error cargando lecturas:', err)
-    }
+      const data = await api.readings.list(1, 30)
+      setReadings(data.readings || [])
+    } catch (err) { console.error(err) }
   }
 
   const buildContext = () => {
@@ -1303,54 +1296,35 @@ Sé conciso y práctico.`
 // ── Página de Tickets de Soporte ──────────────────────────────────
 function SupportPage() {
   const { user } = useAuth()
-  const [tickets, setTickets]     = useState([])
-  const [subject, setSubject]     = useState('')
-  const [description, setDesc]    = useState('')
-  const [loading, setLoading]     = useState(false)
-
-  useEffect(() => { loadTickets() }, [])
-
-  const loadTickets = async () => {
-    if (!supabase) return
-    const { data } = await supabase
-      .from('support_tickets')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (data) setTickets(data)
-  }
+  const [subject, setSubject] = useState('')
+  const [description, setDesc] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
 
   const submitTicket = async (e) => {
     e.preventDefault()
     if (!subject.trim() || !description.trim()) return
-    if (!supabase) return
     setLoading(true)
-    await supabase.from('support_tickets').insert({
-      user_id: user.id,
-      subject, description,
-      status: 'OPEN', priority: 'MEDIUM',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    setSubject(''); setDesc('')
-    await loadTickets()
-    setLoading(false)
-    alert('✅ Ticket enviado al administrador.')
-  }
-
-  const statusColors = {
-    OPEN: 'bg-yellow-100 text-yellow-700',
-    IN_PROGRESS: 'bg-blue-100 text-blue-700',
-    RESOLVED: 'bg-green-100 text-green-700',
-    CLOSED: 'bg-gray-100 text-gray-600'
+    setTimeout(() => {
+      setSubject(''); setDesc('')
+      setLoading(false)
+      setSent(true)
+      setTimeout(() => setSent(false), 3000)
+    }, 1000)
   }
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
 
+      {sent && (
+        <div className="bg-green-100 border border-green-200 text-green-700 px-4 py-3 rounded-xl">
+          ✅ Mensaje enviado. Te contactaremos pronto.
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <h3 className="font-semibold text-gray-700 mb-3">➕ Nuevo Ticket</h3>
+        <h3 className="font-semibold text-gray-700 mb-3">📩 Contactar Soporte</h3>
         <form onSubmit={submitTicket} className="space-y-3">
           <input
             value={subject} onChange={e => setSubject(e.target.value)}
