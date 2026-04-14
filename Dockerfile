@@ -15,6 +15,9 @@ COPY src ./src
 # Compilar (esto crea el JAR en target/)
 RUN mvn package -DskipTests -q
 
+# Copiar base de datos SQLite
+COPY agropulse.db /app/agropulse.db
+
 # ============================================
 # STAGE 2: Runtime (producción)
 # ============================================

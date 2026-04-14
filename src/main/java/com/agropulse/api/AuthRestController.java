@@ -4,6 +4,7 @@ import com.agropulse.dao.UserDao;
 import com.agropulse.model.User;
 import com.agropulse.model.SystemLog;
 import com.agropulse.dao.SystemLogDao;
+import com.agropulse.util.CryptoUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -56,11 +57,11 @@ public class AuthRestController extends JsonRestController {
 
         List<User> users = userDao.findAll();
         User user = users.stream()
-            .filter(u -> u.getUsername().equals(username) && u.getPassword().equals(password))
+            .filter(u -> u.getUsername().equals(username))
             .findFirst()
             .orElse(null);
 
-        if (user == null) {
+        if (user == null || !CryptoUtils.verifyPassword(password, user.getPassword())) {
             sendError(resp, 401, "Credenciales inválidas");
             return;
         }
