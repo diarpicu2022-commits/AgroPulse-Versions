@@ -189,8 +189,20 @@ function LoginPage({ onLogin }) {
     setLoading(true)
     setError('')
     try {
-      const data = await api.auth.login(username, password)
-      onLogin(data)
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: username,
+          password: password
+        })
+        if (error) {
+          setError('Credenciales incorrectas')
+        } else {
+          onLogin({ user: data.user, email: data.user.email })
+        }
+      } else {
+        const data = await api.auth.login(username, password)
+        onLogin(data)
+      }
     } catch (err) {
       setError('Error: ' + err.message)
     } finally {
