@@ -30,6 +30,12 @@ const getGitHubToken = () => {
     || ''
 }
 
+const getOpenRouterKey = () => {
+  return safeGet('agropulse_openrouter_key')
+    || import.meta.env.VITE_OPENROUTER_KEY
+    || ''
+}
+
 async function callAI(prompt, sensorContext = '') {
   const systemPrompt = `Eres un experto agrónomo e ingeniero de invernaderos. Tu nombre es AgroPulse IA.
 Respondes en español, de forma concisa y práctica.
@@ -1649,7 +1655,7 @@ export default function App() {
               <p className="text-xs opacity-70 mt-1">{user.full_name || user.username}</p>
             </div>
             <button onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-green-600 rounded-lg transition-colors">
+              className="p-1 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
               <X size={20} />
             </button>
           </div>
@@ -1706,7 +1712,7 @@ export default function App() {
           {page === 'dashboard'   && <Dashboard />}
           {page === 'sensors'    && <SensorsPage />}
           {page === 'actuators'  && <ActuatorsPage />}
-          {page === 'greenhouses'&& <GreenhousePage />}
+          {page === 'greenhouses' && <GreenhousePage />}
           {page === 'crops'      && <CropsPage />}
           {page === 'simulate'   && <SimulationPage />}
           {page === 'ai'         && <AIPage />}
@@ -1716,7 +1722,6 @@ export default function App() {
           {page === 'users'      && <UsersPage />}
           {page === 'support'    && <SupportPage />}
           {page === 'settings'   && <SettingsPage />}
-          {page === 'greenhouses' && <GreenhousePage />}
         </main>
       </div>
     </AuthContext.Provider>
