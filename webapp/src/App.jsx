@@ -1674,8 +1674,12 @@ export default function App() {
     { id: 'sensors',   label: 'Sensores',  icon: Activity },
     { id: 'actuators', label: 'Actuadores',icon: Zap },
     { id: 'crops',     label: 'Cultivos',  icon: Leaf },
+    { id: 'simulate',  label: 'Simular',  icon: RefreshCw },
+    { id: 'ai',       label: 'IA',      icon: Bot },
+    { id: 'ml',      label: 'ML',     icon: Cpu },
     { id: 'alerts',   label: 'Alertas',  icon: Bell },
     { id: 'support',  label: 'Soporte',  icon: MessageCircle },
+    { id: 'settings', label: 'Config',  icon: Settings },
   ]
 
   const navigate = (id) => {
