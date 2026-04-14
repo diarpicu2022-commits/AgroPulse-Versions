@@ -553,29 +553,41 @@ function SensorsPage() {
 function ActuatorsPage() {
   const [actuators, setActuators] = useState([])
   const [loading, setLoading]     = useState(true)
+  const [showForm, setShowForm]   = useState(false)
+  const [form, setForm] = useState({ name: '', type: 'EXTRACTOR', greenhouseId: 1 })
 
   useEffect(() => { loadActuators() }, [])
 
   const loadActuators = async () => {
-    if (!supabase) { setLoading(false); return }
     try {
-      const { data } = await supabase
-        .from('actuators')
-        .select('*')
-        .order('id', { ascending: true })
-      if (data) setActuators(data)
-    } catch (err) {
-      console.error('Error cargando actuadores:', err)
-    } finally {
-      setLoading(false)
-    }
+      const data = await api.actuators.list()
+      setActuators(data.actuators || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
   }
 
-  const toggleField = async (id, field, currentValue) => {
-    if (!supabase) return
-    const newVal = field === 'enabled' ? (currentValue ? 0 : 1) : !currentValue
-    await supabase.from('actuators').update({ [field]: newVal }).eq('id', id)
-    await loadActuators()
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await api.actuators.create(form)
+      setShowForm(false)
+      setForm({ name: '', type: 'EXTRACTOR', greenhouseId: 1 })
+      loadActuators()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const toggleEnabled = async (id, currentEnabled) => {
+    try {
+      await api.actuators.update(id, { enabled: !currentEnabled })
+      loadActuators()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const handleDelete = async (id) => {
+    if (confirm('¿Eliminar?')) {
+      try { await api.actuators.delete(id); loadActuators() }
+      catch (err) { alert('Error: ' + err.message) }
+    }
   }
 
   const typeInfo = {
@@ -589,11 +601,23 @@ function ActuatorsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-800">⚡ Control de Actuadores</h2>
-        <button onClick={loadActuators}
-          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
-          <RefreshCw size={14} className="inline mr-1" /> Actualizar
+        <button onClick={() => setShowForm(!showForm)} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium">
+          {showForm ? 'Cancelar' : '+ Nuevo'}
         </button>
       </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+          <input type="text" placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" required />
+          <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm">
+            <option value="EXTRACTOR">Extractor de Aire</option>
+            <option value="DOOR">Puerta</option>
+            <option value="HEAT_GENERATOR">Generador de Calor</option>
+            <option value="WATER_PUMP">Bomba de Agua</option>
+          </select>
+          <button type="submit" className="w-full bg-primary text-white py-2 rounded-xl font-medium">Guardar</button>
+        </form>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-40">
@@ -602,8 +626,8 @@ function ActuatorsPage() {
       ) : actuators.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Zap size={48} className="mx-auto mb-3 opacity-40" />
-          <p>No hay actuadores configurados</p>
-          <p className="text-xs mt-1">Configúralos desde la aplicación de escritorio</p>
+          <p>No hay actuadores</p>
+          <button onClick={() => setShowForm(true)} className="text-primary text-sm mt-2">Crear uno nuevo</button>
         </div>
       ) : (
         <div className="space-y-3">
