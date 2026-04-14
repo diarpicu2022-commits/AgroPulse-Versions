@@ -6,7 +6,13 @@ import {
   CheckCircle, XCircle, Info, Key, Wifi, WifiOff,
   Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight
 } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
 import api from './services/api-client'
+
+// ── Supabase Client ────────────────────────────────────────────────
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 // ── API URL para REST (backend Java) ────────────────────────
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
