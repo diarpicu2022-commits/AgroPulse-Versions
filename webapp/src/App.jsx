@@ -197,11 +197,15 @@ function LoginPage({ onLogin }) {
         if (error) {
           setError('Credenciales incorrectas')
         } else {
-          onLogin({ user: data.user, email: data.user.email })
+          const email = data.user.email || username
+          const isAdmin = email === 'diarpicu2025@gmail.com' || 
+                         email === 'admin@agropulse.com' ||
+                         email.toLowerCase().includes('admin')
+          onLogin({ user: data.user, email: email, role: isAdmin ? 'admin' : 'user' })
         }
       } else {
         const data = await api.auth.login(username, password)
-        onLogin(data)
+        onLogin({ ...data, role: data.role || 'user' })
       }
     } catch (err) {
       setError('Error: ' + err.message)
@@ -1463,13 +1467,15 @@ export default function App() {
           return
         }
 
-        // Si no existe, usar datos de Google como usuario temporal
+        const userEmail = authUser.email?.toLowerCase() || ''
+        const isAdmin = userEmail === 'diarpicu2025@gmail.com' || 
+                       userEmail.includes('admin')
         setUser({
           id: authUser.id,
           username: username,
           full_name: authUser.user_metadata?.full_name || authUser.email,
           email: authUser.email,
-          role: 'OPERATOR',
+          role: isAdmin ? 'ADMIN' : 'OPERATOR',
           active: 1
         })
       } catch (err) {
