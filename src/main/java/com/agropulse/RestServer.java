@@ -54,6 +54,7 @@ public class RestServer {
         System.out.println("    GET    /api/readings");
         System.out.println("    GET    /api/alerts");
         System.out.println("    GET    /api/logs");
+        System.out.println("    POST   /api/seed");
         
         server.join();
     }
@@ -72,6 +73,7 @@ public class RestServer {
             controllers.put("/api/readings", new ReadingRestController());
             controllers.put("/api/alerts", new AlertRestController());
             controllers.put("/api/logs", new LogRestController());
+            controllers.put("/api/seed", new SeedRestController());
         }
         
         @Override
