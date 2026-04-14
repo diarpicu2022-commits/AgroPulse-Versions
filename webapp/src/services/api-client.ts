@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || 'https://agropulse-versions-production.up.railway.app';
 
 async function request(endpoint, options = {}) {
   const url = `${API_URL}${endpoint}`;

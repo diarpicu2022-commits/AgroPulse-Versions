@@ -189,27 +189,13 @@ function LoginPage({ onLogin }) {
     setLoading(true)
     setError('')
     try {
-      if (supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: username,
-          password: password
-        })
-        if (error) {
-          setError('Credenciales incorrectas')
-        } else {
-          const email = data.user.email || username
-          const isAdmin = email === 'diarpicu2025@gmail.com' || 
-                         email === 'diarpicu2022@gmail.com' ||
-                         email === 'admin@agropulse.com' ||
-                         email.toLowerCase().includes('admin')
-          onLogin({ user: data.user, email: email, role: isAdmin ? 'admin' : 'user' })
-        }
-      } else {
-        const data = await api.auth.login(username, password)
-        onLogin({ ...data, role: data.role || 'user' })
-      }
+      // Always use REST API first (Supabase is optional)
+      const data = await api.auth.login(username, password)
+      const email = data.username
+      const isAdmin = data.role === 'ADMIN' || email === 'admin' || email === 'diarpicu2022@gmail.com'
+      onLogin({ ...data, email: email, role: isAdmin ? 'admin' : 'user' })
     } catch (err) {
-      setError('Error: ' + err.message)
+      setError('Credenciales incorrectas')
     } finally {
       setLoading(false)
     }
@@ -1054,16 +1040,12 @@ function AIPage() {
   }, [])
 
   const loadLatestReadings = async () => {
-    if (!supabase) return
     try {
-      const { data } = await supabase
-        .from('sensor_readings')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(20)
-      if (data) setReadings(data)
+      const data = await api.readings.list(1, 20)
+      setReadings(data.readings || [])
     } catch (err) {
       console.error('Error cargando lecturas:', err)
+      setReadings([])
     }
   }
 
@@ -1190,7 +1172,10 @@ function MLPage() {
     try {
       const data = await api.readings.list(1, 30)
       setReadings(data.readings || [])
-    } catch (err) { console.error(err) }
+    } catch (err) { 
+      console.error(err)
+      setReadings([])
+    }
   }
 
   const buildContext = () => {
