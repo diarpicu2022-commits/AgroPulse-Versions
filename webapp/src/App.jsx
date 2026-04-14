@@ -199,6 +199,7 @@ function LoginPage({ onLogin }) {
         } else {
           const email = data.user.email || username
           const isAdmin = email === 'diarpicu2025@gmail.com' || 
+                         email === 'diarpicu2022@gmail.com' ||
                          email === 'admin@agropulse.com' ||
                          email.toLowerCase().includes('admin')
           onLogin({ user: data.user, email: email, role: isAdmin ? 'admin' : 'user' })
@@ -1469,6 +1470,7 @@ export default function App() {
 
         const userEmail = authUser.email?.toLowerCase() || ''
         const isAdmin = userEmail === 'diarpicu2025@gmail.com' || 
+                       userEmail === 'diarpicu2022@gmail.com' ||
                        userEmail.includes('admin')
         setUser({
           id: authUser.id,
