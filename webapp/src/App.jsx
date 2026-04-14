@@ -1046,7 +1046,35 @@ function AIPage() {
   const [response, setResponse]   = useState('')
   const [loading, setLoading]     = useState(false)
 
-  const sendToAI = async () => {
+  const sendToAI = async (type) => {
+    setLoading(true)
+    setResponse('')
+    
+    let promptText = ''
+    switch(type) {
+      case 'recommendation':
+        promptText = 'Eres un agrónomo experto. Basándote en las condiciones actuales del invernadero, proporciona recomendaciones específicas para optimizar el cultivo. Considera temperatura, humedad y luminosidad.'
+        break
+      case 'prediction':
+        promptText = 'Eres experto en invernaderos. Predice qué actuadores será necesario activar en las próximas horas y por qué. Considera las tendencias actuales de los sensores.'
+        break
+      case 'analysis':
+        promptText = 'Analiza el estado completo del invernadero. Proporciona: 1) Estado general, 2) Problemas detectados, 3) Acciones recomendadas. Sé conciso y práctico.'
+        break
+      default:
+        promptText = prompt
+    }
+    
+    try {
+      const result = await callAI(promptText, '')
+      setResponse(result)
+    } catch (err) {
+      setResponse('Error: ' + err.message)
+    }
+    setLoading(false)
+  }
+
+  const sendCustom = async () => {
     if (!prompt.trim()) return
     setLoading(true)
     try {
@@ -1061,29 +1089,67 @@ function AIPage() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800">🤖 AgroPulse IA</h2>
-      
+
+      {/* Estado de IAs */}
+      <div className="flex gap-2 text-xs">
+        {getGroqKey() && <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">⚡ Groq</span>}
+        {getGitHubToken() && <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">🐙 GitHub</span>}
+        {getGemmaKey() && <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">🧠 Gemma</span>}
+        {!getGroqKey() && !getGitHubToken() && !getGemmaKey() && (
+          <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">⚠️ Sin IA configurada</span>
+        )}
+      </div>
+
+      {/* 3 botones principales */}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          onClick={() => sendToAI('recommendation')}
+          disabled={loading}
+          className="bg-white border border-gray-200 hover:border-green-400 hover:bg-green-50 rounded-xl p-3 text-sm font-medium text-gray-700 transition-all disabled:opacity-50"
+        >
+          💡 Recomendación
+        </button>
+        <button
+          onClick={() => sendToAI('prediction')}
+          disabled={loading}
+          className="bg-white border border-gray-200 hover:border-green-400 hover:bg-green-50 rounded-xl p-3 text-sm font-medium text-gray-700 transition-all disabled:opacity-50"
+        >
+          🔮 Predicción
+        </button>
+        <button
+          onClick={() => sendToAI('analysis')}
+          disabled={loading}
+          className="bg-white border border-gray-200 hover:border-green-400 hover:bg-green-50 rounded-xl p-3 text-sm font-medium text-gray-700 transition-all disabled:opacity-50"
+        >
+          🔍 Análisis
+        </button>
+      </div>
+
+      {/* Pregunta libre */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <p className="text-sm text-gray-600 mb-4">
-          Consulta a la inteligencia artificial sobre tu invernadero.
-        </p>
         <textarea
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
-          placeholder="¿Qué quieres saber?"
+          placeholder="Escribe tu pregunta..."
           className="w-full border rounded-xl px-3 py-2 text-sm"
           rows={3}
         />
         <button
-          onClick={sendToAI}
+          onClick={sendCustom}
           disabled={loading || !prompt.trim()}
           className="mt-2 w-full bg-green-600 text-white py-2 rounded-xl font-medium disabled:opacity-50"
         >
-          {loading ? 'Consultando...' : '🤖 Preguntar'}
+          {loading ? 'Consultando...' : '🤖 Enviar'}
         </button>
       </div>
 
+      {/* Respuesta */}
       {response && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Bot size={16} className="text-green-600" />
+            <span className="text-sm font-semibold text-gray-700">Respuesta</span>
+          </div>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
         </div>
       )}
@@ -1093,25 +1159,12 @@ function AIPage() {
 
 // ── Página de ML
 function MLPage() {
-  const buildContext = () => {
-    if (readings.length === 0) return ''
-    const byType = {}
-    readings.forEach(r => {
-      if (!byType[r.sensor_type]) byType[r.sensor_type] = []
-      byType[r.sensor_type].push(r)
-    })
-    let ctx = 'Historial reciente de sensores (últimas lecturas):\n'
-    for (const [type, items] of Object.entries(byType)) {
-      const values = items.slice(0, 10).map(r => r.value.toFixed(1)).join(', ')
-      ctx += `- ${type}: [${values}]\n`
-    }
-    return ctx
-  }
+  const [prediction, setPrediction] = useState('')
+  const [loading, setLoading]       = useState(false)
 
   const predict = async () => {
     setLoading(true)
     setPrediction('')
-    const ctx = buildContext()
     const prompt = `Basándote en el historial reciente de sensores del invernadero, predice los valores de cada sensor para las próximas 6 horas (en intervalos de 1 hora).
 
 Presenta los resultados en un formato claro con:
@@ -1122,7 +1175,7 @@ Presenta los resultados en un formato claro con:
 
 Sé conciso y práctico.`
 
-    const result = await callAI(prompt, ctx)
+    const result = await callAI(prompt, '')
     setPrediction(result)
     setLoading(false)
   }
@@ -1131,65 +1184,33 @@ Sé conciso y práctico.`
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800">📈 ML — Predicciones</h2>
 
-      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xl ${
-        getOpenRouterKey() ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
-      }`}>
-        {getOpenRouterKey() ? (
-          <><CheckCircle size={14} /> Motor de predicción activo (Gemini Experimental)</>
-        ) : (
-          <><XCircle size={14} /> Configura la clave de IA para usar predicciones.</>
-        )}
+      <div className="text-xs px-3 py-2 rounded-xl bg-green-50 text-green-700">
+<Cpu size={14} className="inline mr-1" /> Predicciones de Machine Learning
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <p className="text-sm text-gray-600 mb-3">
-          Utiliza inteligencia artificial para predecir los valores futuros de los sensores basándose en el historial reciente.
+          Utiliza inteligencia artificial para predecir los valores futuros de los sensores.
         </p>
         <button
           onClick={predict}
           disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl text-sm font-medium disabled:opacity-50"
         >
-          {loading ? (
-            <><div className="animate-spin text-lg">🌿</div> Calculando predicción...</>
-          ) : (
-            <><BarChart3 size={16} /> Predecir próximas 6 horas</>
-          )}
+          {loading ? 'Calculando...' : '🔮 Predecir próximas 6 horas'}
         </button>
       </div>
 
-      {readings.length > 0 && !prediction && !loading && (
+      {prediction && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">📡 Datos disponibles para predicción</h3>
-          <p className="text-xs text-gray-500">{readings.length} lecturas recientes cargadas como contexto.</p>
-        </div>
-      )}
-
-      {(prediction || loading) && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 bg-purple-100 rounded-lg">
-              <Cpu size={16} className="text-purple-700" />
-            </div>
-            <span className="text-sm font-semibold text-gray-700">Predicción AgroPulse ML</span>
-          </div>
-          {loading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="animate-spin text-xl">🌿</div>
-              Analizando tendencias y calculando predicción...
-            </div>
-          ) : (
-            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {prediction}
-            </div>
-          )}
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{prediction}</p>
         </div>
       )}
     </div>
   )
 }
 
-// ── Página de Tickets de Soporte ──────────────────────────────────
+// ── Página de Soporte ──────────────────────────────────
 function SupportPage() {
   return (
     <div className="space-y-6">
