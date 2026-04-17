@@ -1,0 +1,6 @@
+[
+  {"name": "Temperatura Interna", "type": "TEMPERATURE_INTERNAL", "location": "Centro"},
+  {"name": "Temperatura Externa", "type": "TEMPERATURE_EXTERNAL", "location": "Techo"},
+  {"name": "Humedad Relativa", "type": "HUMIDITY", "location": "Lateral"},
+  {"name": "Humedad Suelo", "type": "SOIL_MOISTURE", "location": "Suelo"}
+]
