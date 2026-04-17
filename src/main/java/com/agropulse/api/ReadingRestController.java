@@ -35,11 +35,16 @@ public class ReadingRestController extends JsonRestController {
         int limit = limitParam != null ? Integer.parseInt(limitParam) : 100;
         List<SensorReading> list;
         
-        if (sensorParam != null) {
+        if (sensorParam != null && !sensorParam.isEmpty()) {
+            // Filtrar por sensor específico
             int sensorId = Integer.parseInt(sensorParam);
             list = readingDao.findBySensorId(sensorId, limit);
         } else {
+            // Sin filtro: devolver TODAS las últimas N lecturas
             list = readingDao.findAll();
+            if (list.size() > limit) {
+                list = list.subList(0, limit);
+            }
         }
         
         JsonArray arr = new JsonArray();

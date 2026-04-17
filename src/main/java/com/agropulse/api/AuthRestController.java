@@ -52,6 +52,34 @@ public class AuthRestController extends JsonRestController {
 
     private void login(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         JsonObject body = gson.fromJson(req.getReader(), JsonObject.class);
+        
+        // Flujo 1: Login con Google (email + name)
+        if (body.has("email") && body.has("name")) {
+            String email = body.get("email").getAsString();
+            String name = body.get("name").getAsString();
+            String googleId = body.has("googleId") ? body.get("googleId").getAsString() : email;
+            
+            // ✅ Obtener email admin desde variable de entorno (no hardcodear)
+            String adminEmail = System.getenv("AGROPULSE_ADMIN_EMAIL");
+            if (adminEmail == null || adminEmail.isEmpty()) {
+                adminEmail = "admin@agropulse.local"; // Fallback seguro
+            }
+            String role = adminEmail.equals(email) ? "ADMIN" : "USER";
+            
+            logDao.save(new SystemLog("LOGIN", "Login Google desde webapp", email));
+            
+            JsonObject response = new JsonObject();
+            response.addProperty("id", 0); // Google users don't have DB id
+            response.addProperty("username", email);
+            response.addProperty("full_name", name);
+            response.addProperty("role", role);
+            response.addProperty("provider", "GOOGLE");
+            
+            sendJson(resp, response);
+            return;
+        }
+        
+        // Flujo 2: Login con username/password (credenciales locales)
         String username = body.has("username") ? body.get("username").getAsString() : "";
         String password = body.has("password") ? body.get("password").getAsString() : "";
 
@@ -73,6 +101,7 @@ public class AuthRestController extends JsonRestController {
         response.addProperty("username", user.getUsername());
         response.addProperty("full_name", user.getFullName());
         response.addProperty("role", user.getRole().name());
+        response.addProperty("provider", "LOCAL");
 
         sendJson(resp, response);
     }

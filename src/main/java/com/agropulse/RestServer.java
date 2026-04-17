@@ -31,6 +31,9 @@ public class RestServer {
         var db = com.agropulse.pattern.singleton.DatabaseConnection.getInstance();
         System.out.println("  [DB] Conexión ready");
         
+        // Iniciar servicio de ejecución de reglas automáticas
+        com.agropulse.service.RuleExecutorService.start();
+        
         // Crear servidor Jetty
         server = new Server(REST_PORT);
         ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -74,6 +77,9 @@ public class RestServer {
             controllers.put("/api/alerts", new AlertRestController());
             controllers.put("/api/logs", new LogRestController());
             controllers.put("/api/seed", new SeedRestController());
+            controllers.put("/api/rules", new RulesRestController());
+            // TODO: ReportRestController tiene problemas de compilación - pendiente
+            // controllers.put("/api/reports", new ReportRestController());
         }
         
         @Override

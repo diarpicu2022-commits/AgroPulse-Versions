@@ -33,6 +33,12 @@ export const auth = {
       body: JSON.stringify({ username, password }),
     }),
   
+  googleLogin: (email, name, googleId) =>
+    request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, name, googleId }),
+    }),
+  
   me: () => request('/api/auth/me'),
 };
 
@@ -112,7 +118,14 @@ export const users = {
 
 // Readings
 export const readings = {
-  list: (sensorId, limit = 100) => request(`/api/readings?sensor=${sensorId}&limit=${limit}`),
+  list: (sensorId, limit = 100) => {
+    // Si no hay sensorId, devolver TODAS las lecturas (últimas 100)
+    if (!sensorId) {
+      return request(`/api/readings?limit=${limit}`);
+    }
+    // Si hay sensorId, filtrar por ese sensor
+    return request(`/api/readings?sensor=${sensorId}&limit=${limit}`);
+  },
   create: (data) => request('/api/readings', { method: 'POST', body: JSON.stringify(data) }),
 };
 
@@ -129,4 +142,21 @@ export const logs = {
   list: (limit = 100) => request(`/api/logs?limit=${limit}`),
 };
 
-export default { auth, sensors, crops, greenhouses, actuators, users, readings, alerts, logs };
+// Automation Rules
+export const rules = {
+  list: () => request('/api/rules'),
+  create: (data) => request('/api/rules', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/api/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/api/rules/${id}`, { method: 'DELETE' }),
+};
+
+// Reports
+export const reports = {
+  dailyCsv: () => request('/api/reports/daily-csv'),
+  weeklyStats: () => request('/api/reports/weekly-stats'),
+  sendEmail: (data) => request('/api/reports/send-email', { method: 'POST', body: JSON.stringify(data) }),
+  schedule: (data) => request('/api/reports/schedule', { method: 'POST', body: JSON.stringify(data) }),
+  history: (limit = 10) => request(`/api/reports/history?limit=${limit}`),
+};
+
+export default { auth, sensors, crops, greenhouses, actuators, users, readings, alerts, logs, rules, reports };
