@@ -17,6 +17,31 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 // ── API URL para REST (backend Java) ────────────────────────
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+// ── LocalStorage Helpers ────────────────────────────────────
+const safeGet = (key) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+const safeSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    console.error('No se pudo guardar en localStorage')
+  }
+}
+
+const safeRemove = (key) => {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    console.error('No se pudo eliminar de localStorage')
+  }
+}
+
 // ── IA Services (Groq, GitHub, Gemma) ────────────────────────────────────────────
 const getGroqKey = () => {
   return safeGet('agropulse_groq_key')
@@ -147,40 +172,51 @@ function SensorCard({ icon: Icon, label, value, unit, color, min, max }) {
 
   const isOk = pct != null && pct >= 0 && pct <= 100
 
+  // Gradientes basados en tipo de sensor
+  const gradients = {
+    'bg-orange-500': 'from-orange-50 to-amber-50 border-orange-100',
+    'bg-blue-500': 'from-blue-50 to-cyan-50 border-blue-100',
+    'bg-cyan-500': 'from-cyan-50 to-sky-50 border-cyan-100',
+    'bg-green-600': 'from-green-50 to-emerald-50 border-green-100',
+  }
+
+  const gradientClass = gradients[color] || 'from-gray-50 to-gray-50 border-gray-100'
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3">
+    <div className={`bg-gradient-to-br ${gradientClass} rounded-2xl shadow-sm border p-4 flex flex-col gap-3 hover:shadow-md transition-all duration-300 hover:scale-[1.02]`}>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`p-2 rounded-xl ${color}`}>
-            <Icon size={20} className="text-white" />
+        <div className="flex items-center gap-3">
+          <div className={`p-3 rounded-xl ${color} shadow-md`}>
+            <Icon size={22} className="text-white" />
           </div>
-          <span className="text-sm font-medium text-gray-600">{label}</span>
+          <span className="text-sm font-semibold text-gray-700">{label}</span>
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-          isOk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        <span className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+          isOk ? 'bg-green-100 text-green-700 shadow-sm' : 'bg-red-100 text-red-700 shadow-sm'
         }`}>
-          {isOk ? 'Óptimo' : 'Fuera de rango'}
+          {isOk ? '✓ Óptimo' : '⚠ Fuera'}
         </span>
       </div>
-      <div className="flex items-end gap-1">
-        <span className="text-3xl font-bold text-gray-800">
-          {value != null ? value.toFixed(1) : '--'}
+      <div className="flex items-end gap-2">
+        <span className="text-4xl font-bold text-gray-800 font-mono">
+          {value != null ? value.toFixed(1) : '—'}
         </span>
-        <span className="text-lg text-gray-500 mb-1">{unit}</span>
+        <span className="text-sm text-gray-500 mb-1">{unit}</span>
       </div>
       {pct != null && (
-        <div className="space-y-1">
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="space-y-2 pt-1">
+          <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                isOk ? 'bg-green-500' : pct < 0 ? 'bg-blue-400' : 'bg-red-400'
+                isOk ? 'bg-gradient-to-r from-green-400 to-emerald-500' : pct < 0 ? 'bg-gradient-to-r from-blue-400 to-cyan-500' : 'bg-gradient-to-r from-red-400 to-rose-500'
               }`}
               style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Min: {min}{unit}</span>
-            <span>Max: {max}{unit}</span>
+          <div className="flex justify-between text-xs text-gray-500 font-medium">
+            <span>{min}{unit}</span>
+            <span className="text-center text-gray-600">{Math.round(pct)}%</span>
+            <span>{max}{unit}</span>
           </div>
         </div>
       )}
@@ -309,23 +345,20 @@ function Dashboard() {
 
   useEffect(() => {
     loadData()
-    const interval = setInterval(loadData, 10000)
+    const interval = setInterval(loadData, 5000)
     return () => clearInterval(interval)
   }, [])
 
   const loadData = async () => {
-    if (!supabase) { setLoading(false); return }
     try {
-      const { data: raw } = await supabase
-        .from('sensor_readings')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(200)
-
-      if (raw) {
-        setReadings(raw)
-        const tempData = raw
-          .filter(r => r.sensor_type === 'TEMPERATURE_INTERNAL')
+      // Cargar lecturas desde API REST (backend Java)
+      const readingsData = await api.readings.list(null, 200)
+      if (readingsData && readingsData.readings) {
+        setReadings(readingsData.readings)
+        
+        // Generar historial de temperatura (últimas 20 lecturas)
+        const tempData = readingsData.readings
+          .filter(r => r.sensorType === 'TEMPERATURE_INTERNAL')
           .slice(0, 20)
           .reverse()
           .map(r => ({
@@ -335,19 +368,17 @@ function Dashboard() {
         setHistory(tempData)
       }
 
-      const { data: al } = await supabase
-        .from('alerts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5)
-      if (al) setAlerts(al)
+      // Cargar alertas
+      const alertsData = await api.alerts.list()
+      if (alertsData && alertsData.alerts) {
+        setAlerts(alertsData.alerts.slice(0, 5))
+      }
 
-      const { data: crops } = await supabase
-        .from('crops')
-        .select('*')
-        .eq('active', 1)
-        .limit(1)
-      if (crops && crops.length > 0) setCrop(crops[0])
+      // Cargar cultivo activo
+      const cropsData = await api.crops.list()
+      if (cropsData && cropsData.crops && cropsData.crops.length > 0) {
+        setCrop(cropsData.crops.find(c => c.active === 1 || c.active === true) || cropsData.crops[0])
+      }
 
       setLastUpdate(new Date().toLocaleTimeString('es-CO'))
     } catch (err) {
@@ -358,34 +389,29 @@ function Dashboard() {
   }
 
   const latest = (type) => {
-    const r = readings.find(r => r.sensor_type === type)
+    const r = readings.find(r => r.sensorType === type)
     return r ? r.value : null
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">
-            Hola, Usuario 👋
+          <h2 className="text-3xl font-bold text-gray-800 mb-1">
+            ¡Bienvenido! 👋
           </h2>
-          <p className="text-sm text-gray-500">
-            {crop ? `🌿 Cultivo activo: ${crop.name}` : 'Sin cultivo activo'}
-            {lastUpdate && ` · Actualizado ${lastUpdate}`}
+          <p className="text-sm text-gray-600">
+            {crop ? `🌿 Cultivo activo: **${crop.name}**` : 'Sin cultivo activo'}
+            {lastUpdate && ` · Actualizado hace momentos`}
           </p>
         </div>
         <button onClick={loadData}
-          className="bg-green-100 text-green-700 px-3 py-2 rounded-xl text-sm font-medium">
-          🔄 Actualizar
+          className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center gap-2">
+          <RefreshCw size={16} className="animate-spin-slow" /> Actualizar
         </button>
       </div>
 
-      {!supabase ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm text-yellow-800">
-          <p className="font-semibold">⚠️ Supabase no configurado</p>
-          <p className="mt-1">Configura VITE_SUPABASE_ANON_KEY en tu archivo .env para conectar con la base de datos.</p>
-        </div>
-      ) : loading ? (
+      {loading ? (
         <div className="flex items-center justify-center h-40">
           <div className="animate-spin text-4xl">🌿</div>
         </div>
@@ -597,6 +623,15 @@ function ActuatorsPage() {
     if (confirm('¿Eliminar?')) {
       try { await api.actuators.delete(id); loadActuators() }
       catch (err) { alert('Error: ' + err.message) }
+    }
+  }
+
+  const toggleField = async (id, field, currentValue) => {
+    try {
+      await api.actuators.update(id, { [field]: !currentValue })
+      loadActuators()
+    } catch (err) {
+      alert('Error: ' + err.message)
     }
   }
 
@@ -1241,6 +1276,7 @@ function SupportPage() {
 
 // ── Página de Configuración ──────────────────────────────────────
 function SettingsPage() {
+  const { logout } = useAuth()
   const [groqKey, setGroqKey]       = useState(safeGet('agropulse_groq_key') || '')
   const [githubKey, setGithubKey]   = useState(safeGet('agropulse_github_token') || '')
   const [gemmaKey, setGemmaKey]     = useState(safeGet('agropulse_gemma_key') || '')
@@ -1574,50 +1610,53 @@ export default function App() {
             onClick={() => setSidebarOpen(false)} />
         )}
 
-        {/* Sidebar Menu */}
-        <div className={`fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-40 transform transition-transform duration-300 ease-in-out ${
+        {/* Sidebar */}
+        <div className={`fixed top-0 left-0 h-full w-64 bg-gradient-to-b from-green-700 via-green-600 to-emerald-700 text-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:block lg:translate-x-0`}>
           {/* Sidebar Header */}
-          <div className="bg-green-700 text-white px-5 py-4 flex items-center justify-between">
-            <div>
+          <div className="bg-gradient-to-r from-green-800 to-emerald-700 px-5 py-5 flex items-center justify-between border-b border-green-600">
+            <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold">🌿 AgroPulse</span>
-                <span className="text-xs opacity-60 bg-green-600 px-1.5 py-0.5 rounded">v6.0</span>
+                <span className="text-2xl font-bold">🌿</span>
+                <div>
+                  <span className="text-lg font-bold">AgroPulse</span>
+                  <span className="text-xs opacity-60 bg-green-500 px-2 py-0.5 rounded ml-1">v6.0</span>
+                </div>
               </div>
-              <p className="text-xs opacity-70 mt-1">{user.full_name || user.username}</p>
+              <p className="text-xs opacity-70 mt-2 text-gray-200">{user.full_name || user.username}</p>
             </div>
             <button onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
+              className="p-1 hover:bg-green-700 rounded-lg transition-colors lg:hidden">
               <X size={20} />
             </button>
           </div>
 
           {/* Sidebar Nav Items */}
-          <div className="py-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+          <div className="py-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 85px)' }}>
             {navItems.map(item => {
               const Icon = item.icon
               const active = page === item.id
               return (
                 <button key={item.id}
                   onClick={() => navigate(item.id)}
-                  className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-colors ${
+                  className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-all duration-200 ${
                     active
-                      ? 'bg-green-50 text-green-700 font-semibold border-r-4 border-green-600'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      ? 'bg-green-500 text-white font-semibold border-r-4 border-yellow-300 shadow-md'
+                      : 'text-green-100 hover:bg-green-600 hover:text-white'
                   }`}>
-                  <Icon size={20} />
+                  <Icon size={20} className={active ? 'text-yellow-300' : ''} />
                   <span className="flex-1 text-left">{item.label}</span>
-                  {active && <ChevronRight size={16} className="text-green-400" />}
+                  {active && <ChevronRight size={16} className="text-yellow-300" />}
                 </button>
               )
             })}
 
             {/* Logout in sidebar */}
-            <div className="border-t border-gray-100 mt-2 pt-2">
+            <div className="border-t border-green-500 mt-3 pt-3">
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-red-200 hover:bg-red-600 hover:text-white transition-all duration-200">
                 <LogOut size={20} />
                 <span>Cerrar sesión</span>
               </button>
@@ -1626,17 +1665,28 @@ export default function App() {
         </div>
 
         {/* Header */}
-        <header className="bg-green-700 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow lg:ml-64">
+        <header className="bg-gradient-to-r from-green-700 via-green-600 to-emerald-600 text-white px-4 py-4 flex items-center justify-between sticky top-0 z-20 shadow-lg lg:ml-64">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)}
-              className="p-1.5 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
+              className="p-2 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
               <Menu size={20} />
             </button>
-            <span className="text-lg font-bold">🌿 AgroPulse</span>
-            <span className="text-xs opacity-60 bg-green-600 px-1.5 py-0.5 rounded">v6.0</span>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">🌿</span>
+              <div>
+                <h1 className="text-lg font-bold">AgroPulse</h1>
+                <p className="text-xs opacity-70">Sistema de Monitoreo Inteligente</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs opacity-80">{user.full_name || user.username}</span>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs opacity-70">Bienvenido</p>
+              <p className="text-sm font-semibold">{user.full_name || user.username}</p>
+            </div>
+            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <span className="text-sm font-bold">👤</span>
+            </div>
           </div>
         </header>
 

@@ -119,12 +119,20 @@ export const readings = {
 // Alerts
 export const alerts = {
   list: () => request('/api/alerts'),
+  create: (data) => request('/api/alerts', { method: 'POST', body: JSON.stringify(data) }),
   markRead: (id) => request(`/api/alerts/${id}/read`, { method: 'PUT' }),
+  delete: (id) => request(`/api/alerts/${id}`, { method: 'DELETE' }),
 };
 
 // Logs
 export const logs = {
   list: (limit = 100) => request(`/api/logs?limit=${limit}`),
+};
+
+// Readings
+export const readings = {
+  list: (sensorId, limit = 100) => request(`/api/readings?sensor=${sensorId}&limit=${limit}`),
+  create: (data) => request('/api/readings', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export default { auth, sensors, crops, greenhouses, actuators, users, readings, alerts, logs };
