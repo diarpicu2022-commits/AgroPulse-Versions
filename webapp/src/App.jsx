@@ -2198,49 +2198,19 @@ function ReportsPage() {
         <div className="space-y-3">
           {schedules.map(schedule => (
             <div key={schedule.id}
-              className={`bg-white rounded-2xl shadow-sm border-2 p-4 transition-all ${
-                schedule.enabled ? 'border-green-200' : 'border-gray-200'
-              }`}>
+              className="bg-white rounded-2xl shadow-sm border-2 border-gray-200 p-4 transition-all">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <p className="text-base font-bold text-gray-800">📧 {schedule.email}</p>
-                  <div className="mt-2 space-y-1 text-sm">
-                    <p className="text-gray-600">
-                      <span className="font-semibold">Frecuencia:</span> {frequencyLabels[schedule.frequency]}
-                    </p>
-                    {schedule.lastSent && (
-                      <p className="text-gray-600">
-                        <span className="font-semibold">Último envío:</span> {new Date(schedule.lastSent).toLocaleString('es-CO')}
-                      </p>
-                    )}
-                    {schedule.nextRun && (
-                      <p className="text-gray-600">
-                        <span className="font-semibold">Próximo envío:</span> {new Date(schedule.nextRun).toLocaleString('es-CO')}
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-sm text-gray-600 mt-1">Frecuencia: {frequencyLabels[schedule.frequency] || schedule.frequency}</p>
                 </div>
-                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                  schedule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {schedule.enabled ? '✅ Activo' : '⏸️ Parado'}
-                </span>
               </div>
 
               <div className="flex gap-2 pt-3 border-t border-gray-200">
                 <button
-                  onClick={() => sendReport(schedule.id)}
+                  onClick={() => sendReport(schedule.email, schedule.frequency)}
                   className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
                   📤 Enviar Ahora
-                </button>
-                <button
-                  onClick={() => toggleSchedule(schedule.id)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    schedule.enabled
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}>
-                  {schedule.enabled ? '⏸️ Pausar' : '▶️ Reanudar'}
                 </button>
                 <button
                   onClick={() => deleteSchedule(schedule.id)}
