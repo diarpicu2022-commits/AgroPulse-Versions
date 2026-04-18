@@ -2028,10 +2028,6 @@ function ReportsPage() {
       loadSchedules()
     } catch (err) { alert('Error: ' + err.message) }
   }
-    } catch (err) {
-      alert('Error: ' + err.message)
-    }
-  }
 
   const generateDailyReport = async () => {
     try {
