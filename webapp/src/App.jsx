@@ -2144,28 +2144,6 @@ function ReportsPage() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Formatos</label>
-            <div className="flex gap-4">
-              {['csv', 'pdf'].map(fmt => (
-                <label key={fmt} className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox"
-                    checked={form.formats.includes(fmt)}
-                    onChange={e => {
-                      if (e.target.checked) {
-                        setForm({...form, formats: [...form.formats, fmt]})
-                      } else {
-                        setForm({...form, formats: form.formats.filter(f => f !== fmt)})
-                      }
-                    }}
-                    className="w-4 h-4 text-green-600 rounded cursor-pointer"
-                  />
-                  <span className="text-sm text-gray-700">{fmt.toUpperCase()}</span>
-                </label>
-              ))}
-          </div>
-
           <div className="flex gap-3 pt-2">
             <button 
               type="submit" 
