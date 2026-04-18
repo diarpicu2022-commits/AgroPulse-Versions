@@ -69,39 +69,44 @@ public class RestServerStandalone {
      * Servlet principal que rutea todas las peticiones REST
      */
     public static class RestServlet extends HttpServlet {
-        private static final Map<String, Object> controllers = new HashMap<>();
+        private static final Map<String, com.agropulse.api.JsonRestController> controllers = new HashMap<>();
 
         static {
             // Registrar controladores REST
             controllers.put("/api/auth", new AuthRestController());
             controllers.put("/api/rules", new RulesRestController());
-            // ReportRestController comentado por problemas de compilación
-            // controllers.put("/api/reports", new ReportRestController());
         }
 
         @Override
         protected void service(HttpServletRequest req, HttpServletResponse resp) throws java.io.IOException {
-            String path = req.getPathInfo();
+            String path = req.getRequestURI();
             String method = req.getMethod();
+            
+            System.out.println("  [REST] " + method + " " + path);
             
             try {
                 // Encontrar controlador apropiado
+                com.agropulse.api.JsonRestController controller = null;
+                
                 for (var entry : controllers.entrySet()) {
-                    if (path != null && path.startsWith(entry.getKey())) {
-                        var controller = entry.getValue();
-                        if (controller instanceof com.agropulse.api.JsonRestController) {
-                            ((com.agropulse.api.JsonRestController) controller).service(req, resp);
-                            return;
-                        }
+                    if (path.startsWith(entry.getKey())) {
+                        controller = entry.getValue();
+                        break;
                     }
                 }
                 
-                // No encontrado
-                resp.setStatus(404);
-                resp.getWriter().write("{\"error\": \"Endpoint no encontrado\"}");
+                if (controller == null) {
+                    resp.setStatus(404);
+                    resp.setContentType("application/json");
+                    resp.getWriter().write("{\"error\": \"Endpoint no encontrado\"}");
+                    return;
+                }
+                
+                controller.handle(path, method, req, resp);
                 
             } catch (Exception e) {
                 resp.setStatus(500);
+                resp.setContentType("application/json");
                 resp.getWriter().write("{\"error\": \"" + e.getMessage() + "\"}");
             }
         }
