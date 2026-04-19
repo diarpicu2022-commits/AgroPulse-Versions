@@ -95,6 +95,19 @@ public class RestServerStandalone {
             String path = req.getRequestURI();
             String method = req.getMethod();
             
+            // CORS Headers - Permitir requests desde cualquier origen
+            resp.setHeader("Access-Control-Allow-Origin", "*");
+            resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Admin-Email");
+            resp.setHeader("Access-Control-Allow-Credentials", "true");
+            resp.setHeader("Access-Control-Max-Age", "3600");
+            
+            // Manejar preflight requests (OPTIONS)
+            if ("OPTIONS".equalsIgnoreCase(method)) {
+                resp.setStatus(200);
+                return;
+            }
+            
             System.out.println("  [REST] " + method + " " + path);
             
             try {
