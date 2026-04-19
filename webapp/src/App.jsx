@@ -4,10 +4,11 @@ import {
   Thermometer, Droplets, Leaf, Bell, Bot, Settings, LogOut,
   Home, Activity, MessageCircle, Send, Cpu, Zap, RefreshCw,
   CheckCircle, XCircle, Info, Key, Wifi, WifiOff,
-  Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight
+  Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight, Mail
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import api from './services/api-client'
+import { DebugInfo } from './debug'
 
 // ── Supabase Client ────────────────────────────────────────────────
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -2892,6 +2893,7 @@ export default function App() {
           {page === 'settings'   && <SettingsPage />}
         </main>
       </div>
+      <DebugInfo />
     </AuthContext.Provider>
   )
 }
