@@ -17,8 +17,12 @@ public class GreenhouseSensorRangeDao {
 
     private void createTableIfNotExists() {
         try (Statement st = conn.createStatement()) {
+            // Detectar tipo de BD
+            boolean isPg = conn.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+            String autoInc = isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
+            
             st.execute("CREATE TABLE IF NOT EXISTS greenhouse_sensor_ranges (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "id " + autoInc + ", " +
                 "greenhouse_id INTEGER NOT NULL, " +
                 "sensor_type VARCHAR(50) NOT NULL, " +
                 "range_min REAL NOT NULL, " +
@@ -30,13 +34,29 @@ public class GreenhouseSensorRangeDao {
     }
 
     public void save(GreenhouseSensorRange r) {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT OR REPLACE INTO greenhouse_sensor_ranges (greenhouse_id, sensor_type, range_min, range_max) VALUES (?, ?, ?, ?)")) {
-            ps.setInt(1, r.getGreenhouseId());
-            ps.setString(2, r.getSensorType());
-            ps.setDouble(3, r.getRangeMin());
-            ps.setDouble(4, r.getRangeMax());
-            ps.executeUpdate();
+        try {
+            // Detectar tipo de BD
+            boolean isPg = conn.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+            
+            String sql;
+            if (isPg) {
+                // PostgreSQL UPSERT
+                sql = "INSERT INTO greenhouse_sensor_ranges (greenhouse_id, sensor_type, range_min, range_max) " +
+                      "VALUES (?, ?, ?, ?) " +
+                      "ON CONFLICT (greenhouse_id, sensor_type) " +
+                      "DO UPDATE SET range_min=EXCLUDED.range_min, range_max=EXCLUDED.range_max";
+            } else {
+                // SQLite INSERT OR REPLACE
+                sql = "INSERT OR REPLACE INTO greenhouse_sensor_ranges (greenhouse_id, sensor_type, range_min, range_max) VALUES (?, ?, ?, ?)";
+            }
+            
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, r.getGreenhouseId());
+                ps.setString(2, r.getSensorType());
+                ps.setDouble(3, r.getRangeMin());
+                ps.setDouble(4, r.getRangeMax());
+                ps.executeUpdate();
+            }
         } catch (SQLException e) {
             System.err.println("Error guardando rango: " + e.getMessage());
         }

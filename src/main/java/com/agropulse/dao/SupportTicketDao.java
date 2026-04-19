@@ -108,8 +108,12 @@ public class SupportTicketDao implements GenericDao<SupportTicket> {
 
     private void ensureTable() {
         try (Statement st = local.createStatement()) {
+            // Detectar tipo de BD
+            boolean isPg = local.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+            String autoInc = isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
+            
             st.execute("CREATE TABLE IF NOT EXISTS support_tickets (" +
-                "id             INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id             " + autoInc + "," +
                 "user_id        INTEGER NOT NULL," +
                 "greenhouse_id  INTEGER DEFAULT 0," +
                 "subject        TEXT    NOT NULL," +

@@ -142,8 +142,16 @@ public class GreenhouseDao implements GenericDao<Greenhouse> {
 
     public void ensureTables() {
         try (Statement st = local.createStatement()) {
+            // Detectar tipo de BD
+            boolean isPg = local.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+            
+            String autoInc = isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
+            String now = isPg ? "CURRENT_TIMESTAMP" : "datetime('now')";
+            String insertCmd = isPg ? "INSERT INTO" : "INSERT OR IGNORE INTO";
+            
+            // Tabla greenhouses
             st.execute("CREATE TABLE IF NOT EXISTS greenhouses (" +
-                "id          INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id          " + (isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT") + "," +
                 "name        TEXT    NOT NULL," +
                 "location    TEXT," +
                 "description TEXT," +
@@ -151,16 +159,20 @@ public class GreenhouseDao implements GenericDao<Greenhouse> {
                 "active      INTEGER NOT NULL DEFAULT 1," +
                 "created_at  TEXT    NOT NULL" +
             ")");
+            
             st.execute("CREATE TABLE IF NOT EXISTS user_greenhouse (" +
                 "user_id       INTEGER NOT NULL," +
                 "greenhouse_id INTEGER NOT NULL," +
                 "assigned_at   TEXT    NOT NULL," +
                 "PRIMARY KEY (user_id, greenhouse_id)" +
             ")");
-            // Invernadero por defecto si no hay ninguno
-            st.execute(
-                "INSERT OR IGNORE INTO greenhouses (id, name, location, description, owner_id, created_at)" +
-                " VALUES (1, 'Invernadero Principal', 'Sede principal', 'Invernadero por defecto', 1, datetime('now'))");
+            
+            // Invernadero por defecto (solo si no existe)
+            if (!isPg) {
+                st.execute(
+                    "INSERT OR IGNORE INTO greenhouses (id, name, location, description, owner_id, created_at)" +
+                    " VALUES (1, 'Invernadero Principal', 'Sede principal', 'Invernadero por defecto', 1, datetime('now'))");
+            }
         } catch (SQLException e) { err(e); }
     }
 
