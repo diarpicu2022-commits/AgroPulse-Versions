@@ -26,12 +26,12 @@ export function DebugInfo() {
       // 2. Verificar Supabase
       let supabaseStatus = '❌ No inicializado'
       try {
-        const { createClient } = require('@supabase/supabase-js')
         const url = import.meta.env.VITE_SUPABASE_URL
         const key = import.meta.env.VITE_SUPABASE_ANON_KEY
         if (url && key) {
-          const client = createClient(url, key)
-          supabaseStatus = '✅ Inicializado'
+          supabaseStatus = '✅ Credenciales detectadas'
+        } else {
+          supabaseStatus = '❌ Falta URL o KEY'
         }
       } catch (e) {
         supabaseStatus = `❌ ${e.message}`
