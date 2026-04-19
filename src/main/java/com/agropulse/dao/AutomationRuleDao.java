@@ -15,21 +15,28 @@ public class AutomationRuleDao {
     }
 
     private void initializeTable() {
-        String sql = """
-            CREATE TABLE IF NOT EXISTS %s (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                condition_type TEXT NOT NULL,
-                condition_value REAL NOT NULL,
-                action_type TEXT NOT NULL,
-                enabled BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_executed TIMESTAMP,
-                FOREIGN KEY(username) REFERENCES users(username)
-            )
-            """.formatted(TABLE);
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              Statement stmt = conn.createStatement()) {
+            
+            // Detectar tipo de BD para usar sintaxis correcta
+            boolean isPg = conn.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+            String autoInc = isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
+            String booleanDefault = isPg ? "DEFAULT true" : "DEFAULT 1";
+            
+            String sql = """
+                CREATE TABLE IF NOT EXISTS %s (
+                    id %s,
+                    username TEXT NOT NULL,
+                    condition_type TEXT NOT NULL,
+                    condition_value REAL NOT NULL,
+                    action_type TEXT NOT NULL,
+                    enabled BOOLEAN %s,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_executed TIMESTAMP,
+                    FOREIGN KEY(username) REFERENCES users(username)
+                )
+                """.formatted(TABLE, autoInc, booleanDefault);
+            
             stmt.execute(sql);
         } catch (SQLException e) {
             System.err.println("Error creating automation_rules table: " + e.getMessage());
@@ -104,7 +111,7 @@ public class AutomationRuleDao {
     }
 
     public List<AutomationRule> findAllEnabled() throws SQLException {
-        String sql = "SELECT * FROM %s WHERE enabled=1 ORDER BY username".formatted(TABLE);
+        String sql = "SELECT * FROM %s WHERE enabled=true ORDER BY username".formatted(TABLE);
         List<AutomationRule> rules = new ArrayList<>();
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              Statement stmt = conn.createStatement()) {

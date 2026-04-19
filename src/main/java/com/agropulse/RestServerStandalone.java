@@ -27,9 +27,22 @@ public class RestServerStandalone {
         System.out.println("=== AgroPulse REST Server (Standalone) ===");
         System.out.println();
         
-        // Inicializar BD
+        // Inicializar BD (con Supabase si está disponible)
         var db = com.agropulse.pattern.singleton.DatabaseConnection.getInstance();
         System.out.println("  ✓ [DB] Conexión ready");
+        
+        // Intentar conectar a Supabase si no está ya configurado
+        if (!db.isOnlineEnabled()) {
+            String supabaseUrl = System.getenv("SUPABASE_JDBC_URL");
+            if (supabaseUrl != null && !supabaseUrl.isBlank()) {
+                System.out.println("  [DB] Intentando conectar a Supabase...");
+                boolean ok = db.configureOnline(supabaseUrl, true);
+                System.out.println("  [DB] Supabase: " + (ok ? "✅ Conectado (PRINCIPAL)" : "⚠️ Falló, usando SQLite"));
+            }
+        }
+        
+        // Mostrar estado de la BD
+        System.out.println(db.getStatusReport());
         
         // Iniciar servicio de ejecución de reglas automáticas
         com.agropulse.service.RuleExecutorService.start();

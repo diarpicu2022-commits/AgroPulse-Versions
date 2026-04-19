@@ -5,18 +5,20 @@ import java.sql.*;
 /**
  * PATRÓN SINGLETON — Conexión dual a bases de datos.
  *
- * LOCAL:   SQLite  (siempre disponible, sin configuración)
- * ONLINE:  PostgreSQL via Supabase (opcional, configurable)
+ * PRIMARY:   PostgreSQL via Supabase (PRINCIPAL - en la nube)
+ * FALLBACK:  SQLite local (respaldo si Supabase no responde)
  *
- * Estrategia: "Local-First"
- *   1. Los datos siempre se guardan en SQLite primero.
- *   2. Si hay conexión online activa, también se sincronizan.
- *   3. Si la BD online falla, la app sigue funcionando con SQLite.
+ * Estrategia: "Online-First"
+ *   1. Intenta conectar a Supabase (PostgreSQL en la nube)
+ *   2. Si Supabase está disponible, úsalo como BD principal
+ *   3. Si Supabase falla, responde con SQLite local (fallback)
+ *   4. Sincronización automática cuando Supabase se recupera
  *
- * Configurar Supabase:
+ * Configurar Supabase (OBLIGATORIO):
  *   1. Crear proyecto en https://supabase.com (gratis)
- *   2. Ir a Settings → Database → Connection string (JDBC)
- *   3. Pegar en el panel  🔌 Configurar APIs → Base de datos online
+ *   2. Ir a Settings → Database → Connection string (JDBC, Session pooler)
+ *   3. Copiar URL: jdbc:postgresql://postgres:PASSWORD@db.XXXXX.supabase.co:5432/postgres
+ *   4. En AgroPulseApp, pasar a DatabaseConnection.getInstance().configureOnline(url, true)
  */
 public class DatabaseConnection {
 
@@ -34,8 +36,16 @@ public class DatabaseConnection {
     // ─── Singleton ────────────────────────────────────────────────────
 
     private DatabaseConnection() {
+        // 1. Conectar a SQLite local primero (para tener respaldo)
         connectLocal();
         initializeDatabase(localConn);
+        
+        // 2. Intentar cargar Supabase desde variables de entorno
+        String supabaseUrl = System.getenv("SUPABASE_JDBC_URL");
+        if (supabaseUrl != null && !supabaseUrl.isBlank()) {
+            System.out.println("  [DB] Supabase URL detectada en env variables, conectando...");
+            configureOnline(supabaseUrl, true);
+        }
     }
 
     public static synchronized DatabaseConnection getInstance() {
@@ -45,8 +55,27 @@ public class DatabaseConnection {
 
     // ─── Conexiones ───────────────────────────────────────────────────
 
-    /** Conexión local SQLite (siempre disponible). */
+    /**
+     * NUEVA LÓGICA (Online-First):
+     * 1. Si Supabase está configurado y disponible → usarlo (PRINCIPAL)
+     * 2. Si Supabase falla o no está configurado → caer a SQLite (FALLBACK)
+     */
     public Connection getConnection() {
+        // Intentar Supabase primero (si está habilitado)
+        if (onlineEnabled && !onlineUrl.isBlank()) {
+            try {
+                if (onlineConn == null || onlineConn.isClosed()) {
+                    connectOnline();
+                }
+                if (onlineConn != null && !onlineConn.isClosed()) {
+                    return onlineConn;  // ✅ Supabase disponible
+                }
+            } catch (SQLException e) {
+                System.err.println("  [DB] Supabase no disponible, usando SQLite: " + e.getMessage());
+            }
+        }
+        
+        // Fallback a SQLite local
         try {
             if (localConn == null || localConn.isClosed()) connectLocal();
         } catch (SQLException e) {
@@ -55,7 +84,7 @@ public class DatabaseConnection {
         return localConn;
     }
 
-    /** Conexión online PostgreSQL/Supabase (puede ser null si no está configurada). */
+    /** Obtener conexión online directamente (devuelve null si no disponible). */
     public Connection getOnlineConnection() {
         if (!onlineEnabled || onlineUrl.isBlank()) return null;
         try {
@@ -89,6 +118,44 @@ public class DatabaseConnection {
     public String getOnlineUrl()       { return onlineUrl; }
     public boolean isOnlineEnabled()   { return onlineEnabled; }
 
+    /**
+     * Obtiene la BD activa actual (PRINCIPAL si Supabase disponible, SQLite si fallback)
+     */
+    public String getActiveDatabase() {
+        if (isOnlineAvailable()) {
+            return "PostgreSQL/Supabase (PRINCIPAL)";
+        } else {
+            return "SQLite Local (FALLBACK)";
+        }
+    }
+
+    /**
+     * Reporte de estado completo
+     */
+    public String getStatusReport() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n════════════════════════════════════════\n");
+        sb.append("  📊 Estado de la Base de Datos\n");
+        sb.append("════════════════════════════════════════\n");
+        
+        sb.append("  SQLite Local:        ✅ Disponible\n");
+        
+        if (onlineEnabled) {
+            if (isOnlineAvailable()) {
+                sb.append("  Supabase:            ✅ Conectado (PRINCIPAL)\n");
+            } else {
+                sb.append("  Supabase:            ❌ Desconectado (fallback a SQLite)\n");
+            }
+        } else {
+            sb.append("  Supabase:            ⏳ No habilitado\n");
+        }
+        
+        sb.append("  BD Activa:           " + getActiveDatabase() + "\n");
+        sb.append("════════════════════════════════════════\n");
+        
+        return sb.toString();
+    }
+
     // ─── Privados ─────────────────────────────────────────────────────
 
     private void connectLocal() {
@@ -104,18 +171,62 @@ public class DatabaseConnection {
         try {
             // PostgreSQL driver class
             Class.forName("org.postgresql.Driver");
-            onlineConn = DriverManager.getConnection(onlineUrl);
-            System.out.println("  [DB-Online] PostgreSQL/Supabase conectado.");
+            System.out.println("  [DB-Online] Extrayendo credenciales de URL...");
+            
+            // Extraer credenciales y URL de conexión
+            String cleanUrl = onlineUrl;
+            String user = "";
+            String pass = "";
+            
+            // Si la URL contiene credenciales embebidas (jdbc:postgresql://user:pass@host...)
+            if (onlineUrl.contains("@")) {
+                String[] parts = onlineUrl.split("@");
+                String urlWithCreds = parts[0]; // jdbc:postgresql://user:pass
+                String urlWithoutCreds = parts[1]; // host:port/db
+                
+                // Extraer user y pass
+                String[] creds = urlWithCreds.substring("jdbc:postgresql://".length()).split(":");
+                if (creds.length >= 2) {
+                    user = creds[0];
+                    pass = creds[1];
+                }
+                
+                // Reconstruir URL sin credenciales para DriverManager
+                cleanUrl = "jdbc:postgresql://" + urlWithoutCreds;
+            }
+            
+            System.out.println("  [DB-Online] User: " + user);
+            System.out.println("  [DB-Online] Conectando a: " + cleanUrl);
+            
+            // Usar DriverManager.getConnection con parámetros separados
+            onlineConn = DriverManager.getConnection(cleanUrl, user, pass);
+            System.out.println("  [DB-Online] ✅ PostgreSQL/Supabase conectado.");
             initializeDatabase(onlineConn);  // Crear tablas también en online
             return true;
         } catch (ClassNotFoundException e) {
-            System.err.println("  [DB-Online] Driver PostgreSQL no encontrado. Agregar dependencia.");
+            System.err.println("  [DB-Online] ❌ Driver PostgreSQL no encontrado. Agregar dependencia.");
             return false;
         } catch (SQLException e) {
-            System.err.println("  [DB-Online] Error de conexión: " + e.getMessage());
+            System.err.println("  [DB-Online] ❌ Error de conexión: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("      Causa: " + e.getCause().getMessage());
+            }
+            // Mostrar mensaje SQLState para obtener pista del error
+            System.err.println("      SQLState: " + e.getSQLState());
             onlineConn = null;
             return false;
         }
+    }
+
+    /** Sanitiza URL para no mostrar contraseña en logs */
+    private String sanitizeUrl(String url) {
+        if (url == null || !url.contains("@")) return url;
+        // Mostrar solo host y puerto, no credenciales
+        String[] parts = url.split("@");
+        if (parts.length > 1) {
+            return "jdbc:postgresql://[USER:PASS]@" + parts[1];
+        }
+        return url;
     }
 
     private void closeOnline() {
