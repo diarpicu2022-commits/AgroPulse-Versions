@@ -18,6 +18,8 @@ bin/
 
 # Variables de entorno (NUNCA subir a GitHub)
 .env
+.env.local
+.env.*.local
 
 # Docker
 Dockerfile
