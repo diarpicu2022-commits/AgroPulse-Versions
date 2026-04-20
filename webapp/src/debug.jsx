@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from 'react'
+import { X, ChevronUp, ChevronDown } from 'lucide-react'
 
 export function DebugInfo() {
   const [info, setInfo] = useState({
@@ -11,6 +12,8 @@ export function DebugInfo() {
     api: null,
     errors: []
   })
+  const [isOpen, setIsOpen] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(true)
 
   useEffect(() => {
     try {
@@ -76,38 +79,71 @@ export function DebugInfo() {
     }
   }, [])
 
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-4 left-4 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-mono text-xs z-50"
+      >
+        🐛 Debug
+      </button>
+    )
+  }
+
   return (
-    <div className="fixed bottom-0 left-0 bg-gray-900 text-white p-4 text-xs max-w-md max-h-96 overflow-auto rounded-tr-lg font-mono z-50 border-t border-r border-green-500">
-      <div className="font-bold mb-2 text-green-400">🐛 DEBUG INFO</div>
-      
-      <div className="mb-2">
-        <div className="text-yellow-400">📦 Environment:</div>
-        <pre className="bg-gray-800 p-2 rounded text-xs whitespace-pre-wrap">
-          {JSON.stringify(info.env, null, 2)}
-        </pre>
+    <div className="fixed bottom-4 left-4 bg-gray-900 text-white text-xs max-w-md rounded-lg font-mono z-50 border border-green-500 shadow-lg overflow-hidden">
+      {/* Header con botones */}
+      <div className="bg-gray-800 p-3 flex justify-between items-center border-b border-green-500">
+        <div className="font-bold text-green-400">🐛 DEBUG INFO</div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="hover:bg-gray-700 p-1 rounded"
+          >
+            {isMinimized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="hover:bg-gray-700 p-1 rounded"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="mb-2">
-        <div className="text-yellow-400">🔷 Supabase:</div>
-        <div className="bg-gray-800 p-2 rounded">{info.supabase}</div>
-      </div>
-
-      <div className="mb-2">
-        <div className="text-yellow-400">🌐 API Backend:</div>
-        <div className="bg-gray-800 p-2 rounded">{info.api}</div>
-      </div>
-
-      {info.errors.length > 0 && (
-        <div className="mb-2">
-          <div className="text-red-400">❌ Errors ({info.errors.length}):</div>
-          <div className="bg-red-900 p-2 rounded text-red-200 text-xs">
-            {info.errors.map((err, i) => (
-              <div key={i} className="mb-2 border-b border-red-700 pb-1">
-                <div className="font-bold">{err.message}</div>
-                <div className="text-red-300 text-xs">{err.stack}</div>
-              </div>
-            ))}
+      {/* Contenido (solo si no está minimizado) */}
+      {!isMinimized && (
+        <div className="p-4 max-h-96 overflow-auto">
+          <div className="mb-2">
+            <div className="text-yellow-400">📦 Environment:</div>
+            <pre className="bg-gray-800 p-2 rounded text-xs whitespace-pre-wrap">
+              {JSON.stringify(info.env, null, 2)}
+            </pre>
           </div>
+
+          <div className="mb-2">
+            <div className="text-yellow-400">🔷 Supabase:</div>
+            <div className="bg-gray-800 p-2 rounded">{info.supabase}</div>
+          </div>
+
+          <div className="mb-2">
+            <div className="text-yellow-400">🌐 API Backend:</div>
+            <div className="bg-gray-800 p-2 rounded">{info.api}</div>
+          </div>
+
+          {info.errors.length > 0 && (
+            <div className="mb-2">
+              <div className="text-red-400">❌ Errors ({info.errors.length}):</div>
+              <div className="bg-red-900 p-2 rounded text-red-200 text-xs">
+                {info.errors.map((err, i) => (
+                  <div key={i} className="mb-2 border-b border-red-700 pb-1">
+                    <div className="font-bold">{err.message}</div>
+                    <div className="text-red-300 text-xs">{err.stack}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
