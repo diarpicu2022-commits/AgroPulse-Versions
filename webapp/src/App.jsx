@@ -2957,24 +2957,37 @@ export default function App() {
       }
     }
 
-    // Verificar sesión existente — await findOrCreateUser para evitar flash de login
+    // Verificar sesión existente con timeout de 4 s para evitar carga infinita
     if (!supabase) {
       setAuthLoading(false)
       return
     }
+
+    let resolved = false
+    const safeFinish = () => {
+      if (!resolved) { resolved = true; setAuthLoading(false) }
+    }
+
+    // Timeout: si Supabase tarda más de 4 s, mostramos login directamente
+    const timer = setTimeout(safeFinish, 4000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timer)
       if (session?.user) {
-        await findOrCreateUser(session.user)
+        await findOrCreateUser(session.user).catch(() => {})
       }
-      setAuthLoading(false)
+      safeFinish()
+    }).catch(() => {
+      clearTimeout(timer)
+      safeFinish()
     })
 
-    // Escuchar cambios de auth
+    // Escuchar cambios de auth (post-login Google OAuth redirect)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        await findOrCreateUser(session.user)
+        await findOrCreateUser(session.user).catch(() => {})
       }
-      setAuthLoading(false)
+      safeFinish()
     })
 
     return () => subscription.unsubscribe()
