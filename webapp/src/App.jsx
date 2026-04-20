@@ -2453,7 +2453,7 @@ function RulesPage() {
 
 // ── Página de Configuración ────────────────────────────────────────
 function SettingsPage() {
-  const { logout } = useAuth()
+  const { user: authUser, logout } = useAuth()
   const [groqKey, setGroqKey]       = useState(safeGet('agropulse_groq_key') || '')
   const [githubKey, setGithubKey]   = useState(safeGet('agropulse_github_token') || '')
   const [gemmaKey, setGemmaKey]     = useState(safeGet('agropulse_gemma_key') || '')
@@ -2502,11 +2502,13 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Usuario</span>
-            <span className="font-medium text-gray-800">Usuario</span>
+            <span className="font-medium text-gray-800">{authUser?.email || 'No especificado'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Rol</span>
-            <span className="font-medium text-gray-800">Usuario</span>
+            <span className={`font-medium px-2 py-1 rounded ${authUser?.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+              {authUser?.role === 'admin' ? '🔴 Administrador' : '🔵 Usuario'}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500">Supabase</span>
@@ -3618,7 +3620,7 @@ function AdminPanel({ user }) {
       setLoading(true)
       const response = await fetch(`${API_URL}/api/auth/users`, {
         headers: {
-          'X-Admin-Email': user.username,
+          'X-Admin-Email': user.email,
           'Content-Type': 'application/json'
         }
       })
@@ -3640,7 +3642,7 @@ function AdminPanel({ user }) {
       const response = await fetch(`${API_URL}/api/auth/users/${userId}/role`, {
         method: 'PUT',
         headers: {
-          'X-Admin-Email': user.username,
+          'X-Admin-Email': user.email,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ role: newRole })

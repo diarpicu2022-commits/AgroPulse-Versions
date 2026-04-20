@@ -149,7 +149,12 @@ public class AuthRestController extends JsonRestController {
     private void listUsers(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         // Verificar que sea ADMIN
         String adminEmail = req.getHeader("X-Admin-Email");
-        if (adminEmail == null || !adminEmail.equals("diarpicu2022@gmail.com")) {
+        String expectedAdminEmail = System.getenv("AGROPULSE_ADMIN_EMAIL");
+        if (expectedAdminEmail == null || expectedAdminEmail.isEmpty()) {
+            expectedAdminEmail = "admin@agropulse.local"; // Fallback seguro
+        }
+        
+        if (adminEmail == null || !adminEmail.equals(expectedAdminEmail)) {
             sendError(resp, 403, "Solo ADMIN puede listar usuarios");
             return;
         }
@@ -174,7 +179,12 @@ public class AuthRestController extends JsonRestController {
     private void changeUserRole(String path, HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         // Verificar que sea ADMIN
         String adminEmail = req.getHeader("X-Admin-Email");
-        if (adminEmail == null || !adminEmail.equals("diarpicu2022@gmail.com")) {
+        String expectedAdminEmail = System.getenv("AGROPULSE_ADMIN_EMAIL");
+        if (expectedAdminEmail == null || expectedAdminEmail.isEmpty()) {
+            expectedAdminEmail = "admin@agropulse.local"; // Fallback seguro
+        }
+        
+        if (adminEmail == null || !adminEmail.equals(expectedAdminEmail)) {
             sendError(resp, 403, "Solo ADMIN puede cambiar roles");
             return;
         }
