@@ -64,14 +64,17 @@ public class DatabaseConnection {
         // Intentar Supabase primero (si está habilitado)
         if (onlineEnabled && !onlineUrl.isBlank()) {
             try {
-                if (onlineConn == null || onlineConn.isClosed()) {
+                // Verificar y reconectar si es necesario
+                if (onlineConn == null || onlineConn.isClosed() || !onlineConn.isValid(2)) {
+                    System.out.println("  [DB-Online] Reconectando...");
                     connectOnline();
                 }
-                if (onlineConn != null && !onlineConn.isClosed()) {
+                if (onlineConn != null && !onlineConn.isClosed() && onlineConn.isValid(2)) {
                     return onlineConn;  // ✅ Supabase disponible
                 }
             } catch (SQLException e) {
                 System.err.println("  [DB] Supabase no disponible, usando SQLite: " + e.getMessage());
+                try { onlineConn = null; } catch (Exception ex) {}
             }
         }
         
@@ -88,9 +91,13 @@ public class DatabaseConnection {
     public Connection getOnlineConnection() {
         if (!onlineEnabled || onlineUrl.isBlank()) return null;
         try {
-            if (onlineConn == null || onlineConn.isClosed()) connectOnline();
+            if (onlineConn == null || onlineConn.isClosed() || !onlineConn.isValid(2)) {
+                System.out.println("  [DB-Online] Reconectando...");
+                connectOnline();
+            }
         } catch (SQLException e) {
             System.err.println("  [DB-Online] Reconexión fallida: " + e.getMessage());
+            try { onlineConn = null; } catch (Exception ex) {}
             return null;
         }
         return onlineConn;
