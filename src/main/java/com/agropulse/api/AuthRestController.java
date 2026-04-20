@@ -39,6 +39,8 @@ public class AuthRestController extends JsonRestController {
     private void handlePost(String path, HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
         if (path.equals("/api/auth/login")) {
             login(req, resp);
+        } else if (path.equals("/api/auth/register")) {
+            register(req, resp);
         } else {
             sendError(resp, 404, "Endpoint not found");
         }
@@ -61,6 +63,44 @@ public class AuthRestController extends JsonRestController {
         } else {
             sendError(resp, 404, "Endpoint not found");
         }
+    }
+
+    private void register(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
+        JsonObject body = gson.fromJson(req.getReader(), JsonObject.class);
+
+        String username = body.has("username") ? body.get("username").getAsString().trim() : "";
+        String password = body.has("password") ? body.get("password").getAsString() : "";
+        String fullName = body.has("fullName") ? body.get("fullName").getAsString().trim() : username;
+
+        if (username.isEmpty() || password.isEmpty()) {
+            sendError(resp, 400, "Usuario y contraseña son requeridos");
+            return;
+        }
+        if (password.length() < 6) {
+            sendError(resp, 400, "La contraseña debe tener al menos 6 caracteres");
+            return;
+        }
+
+        // Verificar unicidad
+        boolean exists = userDao.findAll().stream().anyMatch(u -> u.getUsername().equalsIgnoreCase(username));
+        if (exists) {
+            sendError(resp, 409, "El usuario ya existe");
+            return;
+        }
+
+        com.agropulse.model.User newUser = new com.agropulse.model.User(
+            username, password, fullName.isEmpty() ? username : fullName, "", com.agropulse.model.enums.UserRole.USER
+        );
+        userDao.save(newUser);
+        logDao.save(new SystemLog("REGISTER", "Nuevo usuario registrado", username));
+
+        JsonObject response = new JsonObject();
+        response.addProperty("id",        newUser.getId());
+        response.addProperty("username",   newUser.getUsername());
+        response.addProperty("full_name",  newUser.getFullName());
+        response.addProperty("role",       newUser.getRole().name());
+        response.addProperty("provider",   "LOCAL");
+        sendJson(resp, response);
     }
 
     private void login(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {

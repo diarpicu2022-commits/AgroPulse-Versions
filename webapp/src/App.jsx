@@ -4,11 +4,11 @@ import {
   Thermometer, Droplets, Leaf, Bell, Bot, Settings, LogOut,
   Home, Activity, MessageCircle, Send, Cpu, Zap, RefreshCw,
   CheckCircle, XCircle, Info, Key, Wifi, WifiOff,
-  Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight, Mail
+  Menu, X, ToggleLeft, ToggleRight, Sprout, BarChart3, ChevronRight, Mail,
+  Ticket, Shield, UserPlus, Building2, Sparkles
 } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
-import api from './services/api-client'
-import { DebugInfo } from './debug'
+import api, { setUserContext } from './services/api-client'
 
 // ── Supabase Client ────────────────────────────────────────────────
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
@@ -62,71 +62,50 @@ const getGemmaKey = () => {
     || ''
 }
 
+// Retorna { text: string, provider: string }
 async function callAI(prompt, sensorContext = '') {
   const systemPrompt = `Eres un experto agrónomo e ingeniero de invernaderos. Tu nombre es AgroPulse IA.
 Respondes en español, de forma concisa y práctica.
 Siempre das recomendaciones basadas en datos reales de sensores cuando están disponibles.
 ${sensorContext ? `\nDatos actuales del invernadero:\n${sensorContext}` : ''}`
 
-  // Intentar Groq primero
   const groqKey = getGroqKey()
   if (groqKey) {
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqKey}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
           max_tokens: 600
         })
       })
       const data = await res.json()
-      if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content
-      }
-    } catch (err) {
-      console.error('Groq error:', err)
-    }
+      if (data.choices?.[0]) return { text: data.choices[0].message.content, provider: 'Groq · LLaMA 3.1' }
+    } catch (err) { console.error('Groq error:', err) }
   }
 
-  // Intentar GitHub Models
   const githubToken = getGitHubToken()
   if (githubToken) {
     try {
       const res = await fetch('https://models.github.ai/inference/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${githubToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28'
+          'Authorization': `Bearer ${githubToken}`, 'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'
         },
         body: JSON.stringify({
           model: 'openai/gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
           max_tokens: 600
         })
       })
       const data = await res.json()
-      if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content
-      }
-    } catch (err) {
-      console.error('GitHub error:', err)
-    }
+      if (data.choices?.[0]) return { text: data.choices[0].message.content, provider: 'GitHub · GPT-4o mini' }
+    } catch (err) { console.error('GitHub error:', err) }
   }
 
-  // Intentar Gemma 4 (Google AI Studio)
   const gemmaKey = getGemmaKey()
   if (gemmaKey) {
     try {
@@ -135,26 +114,17 @@ ${sensorContext ? `\nDatos actuales del invernadero:\n${sensorContext}` : ''}`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'gemma-4-31b-it',
-          messages: [
-            { role: 'user', content: systemPrompt + '\n\nPregunta: ' + prompt }
-          ],
-          max_tokens: 600,
-          temperature: 0.7
+          messages: [{ role: 'user', content: systemPrompt + '\n\nPregunta: ' + prompt }],
+          max_tokens: 600, temperature: 0.7
         })
       })
       const data = await res.json()
-      if (data.choices && data.choices[0]) {
-        return data.choices[0].message.content
-      }
-      if (data.error) {
-        console.error('Gemma error:', data.error.message)
-      }
-    } catch (err) {
-      console.error('Gemma error:', err)
-    }
+      if (data.choices?.[0]) return { text: data.choices[0].message.content, provider: 'Google · Gemma 4' }
+      if (data.error) console.error('Gemma error:', data.error.message)
+    } catch (err) { console.error('Gemma error:', err) }
   }
 
-  return '⚠️ No hay servicio de IA disponible. Configura Groq, GitHub o Gemma en Configuración.'
+  return { text: '⚠️ No hay servicio de IA disponible. Configura Groq, GitHub o Gemma en Configuración.', provider: '' }
 }
 
 // ── Contexto de autenticación ────────────────────────────────────
@@ -288,11 +258,16 @@ function AlertsBanner({ alerts, onDismiss }) {
 
 // ── Página de Login ──────────────────────────────────────────────
 function LoginPage({ onLogin }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState('local') // 'local' or 'google'
+  const [username, setUsername]     = useState('')
+  const [password, setPassword]     = useState('')
+  const [regName, setRegName]       = useState('')
+  const [regUser, setRegUser]       = useState('')
+  const [regPass, setRegPass]       = useState('')
+  const [regPass2, setRegPass2]     = useState('')
+  const [error, setError]           = useState('')
+  const [success, setSuccess]       = useState('')
+  const [loading, setLoading]       = useState(false)
+  const [tab, setTab]               = useState('local') // 'local' | 'google' | 'register'
 
   const handleLocalLogin = async (e) => {
     e.preventDefault()
@@ -366,8 +341,10 @@ function LoginPage({ onLogin }) {
           onLogin({
             ...response,
             email: user.email,
+            full_name: user.user_metadata?.full_name || response.full_name,
             role: role,
-            provider: 'GOOGLE'
+            provider: 'GOOGLE',
+            avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
           })
         } catch (err) {
           setError('Error procesando login de Google')
@@ -400,30 +377,30 @@ function LoginPage({ onLogin }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-3 mb-6 bg-gray-100 p-1 rounded-xl">
-          <button
-            onClick={() => { setTab('local'); setError('') }}
-            className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
-              tab === 'local'
-                ? 'bg-white text-green-600 shadow-md'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Usuario
-          </button>
-          <button
-            onClick={() => { setTab('google'); setError('') }}
-            className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
-              tab === 'google'
-                ? 'bg-white text-green-600 shadow-md'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Google
-          </button>
+        <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
+          {[
+            { id: 'local',    label: 'Ingresar' },
+            { id: 'register', label: 'Registrarse' },
+            { id: 'google',   label: 'Google' },
+          ].map(t => (
+            <button key={t.id}
+              onClick={() => { setTab(t.id); setError(''); setSuccess('') }}
+              className={`flex-1 py-2 px-2 rounded-lg font-medium text-xs transition-all ${
+                tab === t.id ? 'bg-white text-green-600 shadow-md' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {/* Tab Content */}
+        {success && (
+          <div className="bg-green-50 border-2 border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm mb-4">
+            ✅ {success}
+          </div>
+        )}
+
         {tab === 'local' ? (
           // ── Local Login ──
           <form onSubmit={handleLocalLogin} className="space-y-4">
@@ -473,6 +450,58 @@ function LoginPage({ onLogin }) {
               )}
             </button>
           </form>
+        ) : tab === 'register' ? (
+          // ── Register ──
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            setError('')
+            setSuccess('')
+            if (!regUser || !regPass) { setError('Completa usuario y contraseña'); return }
+            if (regPass !== regPass2) { setError('Las contraseñas no coinciden'); return }
+            if (regPass.length < 6) { setError('Contraseña mínimo 6 caracteres'); return }
+            setLoading(true)
+            try {
+              const response = await api.auth.register(regUser.trim(), regPass, regName.trim() || regUser.trim())
+              setSuccess('¡Cuenta creada! Ya puedes ingresar.')
+              setTab('local')
+              setUsername(regUser.trim())
+              setRegUser(''); setRegPass(''); setRegPass2(''); setRegName('')
+            } catch (err) {
+              setError(err.message || 'Error al registrarse')
+            } finally { setLoading(false) }
+          }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre completo</label>
+              <input type="text" value={regName} onChange={e => setRegName(e.target.value)}
+                placeholder="Tu nombre"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition-all" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Usuario *</label>
+              <input type="text" value={regUser} onChange={e => setRegUser(e.target.value)}
+                placeholder="usuario123" required
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition-all" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Contraseña *</label>
+              <input type="password" value={regPass} onChange={e => setRegPass(e.target.value)}
+                placeholder="Mínimo 6 caracteres" required
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition-all" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Confirmar contraseña *</label>
+              <input type="password" value={regPass2} onChange={e => setRegPass2(e.target.value)}
+                placeholder="Repite la contraseña" required
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition-all" />
+            </div>
+            {error && <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">⚠️ {error}</div>}
+            <button type="submit" disabled={loading}
+              className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 disabled:from-gray-400 disabled:to-gray-400 text-white font-bold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+              {loading ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Creando cuenta...</> : <>👤 Crear cuenta</>}
+            </button>
+            <p className="text-center text-xs text-gray-500">Tu cuenta será revisada por el administrador para asignarte a un invernadero</p>
+          </form>
+
         ) : (
           // ── Google Login ──
           <div className="space-y-4">
@@ -1260,6 +1289,8 @@ function CropsPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiProvider, setAiProvider] = useState('')
   const [form, setForm] = useState({
     name: '', variety: '',
     temp_min: 15, temp_max: 25,
@@ -1267,6 +1298,39 @@ function CropsPage() {
     soil_moisture_min: 40, soil_moisture_max: 60,
     active: 0
   })
+
+  const fillRangesWithAI = async () => {
+    if (!form.name.trim()) { alert('Ingresa el nombre del cultivo primero'); return }
+    setAiLoading(true)
+    setAiProvider('')
+    const prompt = `Dame los rangos óptimos para cultivo de invernadero de "${form.name}"${form.variety ? ` variedad "${form.variety}"` : ''}.
+Responde SOLO con JSON válido sin markdown, con este formato exacto:
+{"temp_min":18,"temp_max":26,"humidity_min":60,"humidity_max":80,"soil_moisture_min":50,"soil_moisture_max":70}`
+    try {
+      const result = await callAI(prompt, '')
+      const text = result.text.trim()
+      const jsonStr = text.match(/\{[\s\S]*\}/)?.[0]
+      if (jsonStr) {
+        const ranges = JSON.parse(jsonStr)
+        setForm(f => ({
+          ...f,
+          temp_min:          ranges.temp_min          ?? f.temp_min,
+          temp_max:          ranges.temp_max          ?? f.temp_max,
+          humidity_min:      ranges.humidity_min      ?? f.humidity_min,
+          humidity_max:      ranges.humidity_max      ?? f.humidity_max,
+          soil_moisture_min: ranges.soil_moisture_min ?? f.soil_moisture_min,
+          soil_moisture_max: ranges.soil_moisture_max ?? f.soil_moisture_max,
+        }))
+        setAiProvider(result.provider || 'IA')
+      } else {
+        alert('La IA no pudo generar rangos. Intenta de nuevo.')
+      }
+    } catch (err) {
+      alert('Error consultando IA: ' + err.message)
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   useEffect(() => { loadCrops() }, [])
 
@@ -1394,6 +1458,18 @@ function CropsPage() {
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none transition-colors" 
               />
             </div>
+          </div>
+
+          {/* Botón IA rangos */}
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={fillRangesWithAI} disabled={aiLoading}
+              className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 disabled:from-gray-400 disabled:to-gray-400 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md transition-all transform hover:scale-105 disabled:scale-100">
+              {aiLoading
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Consultando IA...</>
+                : <><Sparkles size={15} /> Rellenar rangos con IA</>
+              }
+            </button>
+            {aiProvider && <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-medium">✨ {aiProvider}</span>}
           </div>
 
           {/* Temperatura */}
@@ -1800,33 +1876,24 @@ function AlertsPage() {
 // ── Página de Consultar IA ───────────────────────────────────────
 function AIPage() {
   const [prompt, setPrompt]       = useState('')
-  const [response, setResponse]   = useState('')
+  const [response, setResponse]   = useState(null) // { text, provider }
   const [loading, setLoading]     = useState(false)
 
   const sendToAI = async (type) => {
     setLoading(true)
-    setResponse('')
-    
+    setResponse(null)
     let promptText = ''
     switch(type) {
-      case 'recommendation':
-        promptText = 'Eres un agrónomo experto. Basándote en las condiciones actuales del invernadero, proporciona recomendaciones específicas para optimizar el cultivo. Considera temperatura, humedad y luminosidad.'
-        break
-      case 'prediction':
-        promptText = 'Eres experto en invernaderos. Predice qué actuadores será necesario activar en las próximas horas y por qué. Considera las tendencias actuales de los sensores.'
-        break
-      case 'analysis':
-        promptText = 'Analiza el estado completo del invernadero. Proporciona: 1) Estado general, 2) Problemas detectados, 3) Acciones recomendadas. Sé conciso y práctico.'
-        break
-      default:
-        promptText = prompt
+      case 'recommendation': promptText = 'Eres un agrónomo experto. Basándote en las condiciones actuales del invernadero, proporciona recomendaciones específicas para optimizar el cultivo. Considera temperatura, humedad y luminosidad.'; break
+      case 'prediction':     promptText = 'Eres experto en invernaderos. Predice qué actuadores será necesario activar en las próximas horas y por qué. Considera las tendencias actuales de los sensores.'; break
+      case 'analysis':       promptText = 'Analiza el estado completo del invernadero. Proporciona: 1) Estado general, 2) Problemas detectados, 3) Acciones recomendadas. Sé conciso y práctico.'; break
+      default:               promptText = prompt
     }
-    
     try {
       const result = await callAI(promptText, '')
       setResponse(result)
     } catch (err) {
-      setResponse('Error: ' + err.message)
+      setResponse({ text: 'Error: ' + err.message, provider: '' })
     }
     setLoading(false)
   }
@@ -1838,7 +1905,7 @@ function AIPage() {
       const result = await callAI(prompt, '')
       setResponse(result)
     } catch (err) {
-      setResponse('Error: ' + err.message)
+      setResponse({ text: 'Error: ' + err.message, provider: '' })
     }
     setLoading(false)
   }
@@ -1903,11 +1970,18 @@ function AIPage() {
       {/* Respuesta */}
       {response && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Bot size={16} className="text-green-600" />
-            <span className="text-sm font-semibold text-gray-700">Respuesta</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Bot size={16} className="text-green-600" />
+              <span className="text-sm font-semibold text-gray-700">Respuesta</span>
+            </div>
+            {response.provider && (
+              <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">
+                ✨ {response.provider}
+              </span>
+            )}
           </div>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{response}</p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{response.text}</p>
         </div>
       )}
     </div>
@@ -1916,12 +1990,12 @@ function AIPage() {
 
 // ── Página de ML
 function MLPage() {
-  const [prediction, setPrediction] = useState('')
+  const [prediction, setPrediction] = useState(null) // { text, provider }
   const [loading, setLoading]       = useState(false)
 
   const predict = async () => {
     setLoading(true)
-    setPrediction('')
+    setPrediction(null)
     const prompt = `Basándote en el historial reciente de sensores del invernadero, predice los valores de cada sensor para las próximas 6 horas (en intervalos de 1 hora).
 
 Presenta los resultados en un formato claro con:
@@ -1960,38 +2034,218 @@ Sé conciso y práctico.`
 
       {prediction && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{prediction}</p>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-700">📊 Predicción</span>
+            {prediction.provider && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
+                ✨ {prediction.provider}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{prediction.text}</p>
         </div>
       )}
     </div>
   )
 }
 
-// ── Página de Soporte ──────────────────────────────────
+// ── Página de Soporte — Sistema de Tickets ──────────────────────
 function SupportPage() {
+  const { user } = useAuth()
+  const isAdmin  = user?.role === 'admin' || user?.role === 'ADMIN'
+
+  const [tickets, setTickets]       = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [showForm, setShowForm]     = useState(false)
+  const [selected, setSelected]     = useState(null)
+  const [adminReply, setAdminReply] = useState('')
+  const [replyStatus, setReplyStatus] = useState('IN_PROGRESS')
+  const [form, setForm] = useState({ subject: '', description: '', priority: 'MEDIUM' })
+
+  useEffect(() => { loadTickets() }, [])
+
+  const loadTickets = async () => {
+    try {
+      const data = await api.tickets.list()
+      setTickets(data.tickets || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
+  }
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    try {
+      await api.tickets.create({ ...form, greenhouseId: 0 })
+      setShowForm(false)
+      setForm({ subject: '', description: '', priority: 'MEDIUM' })
+      loadTickets()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const handleReply = async (id) => {
+    if (!adminReply.trim()) return
+    try {
+      await api.tickets.update(id, { adminResponse: adminReply, status: replyStatus })
+      setSelected(null)
+      setAdminReply('')
+      loadTickets()
+    } catch (err) { alert('Error: ' + err.message) }
+  }
+
+  const handleClose = async (id) => {
+    try {
+      await api.tickets.update(id, { status: 'CLOSED' })
+      loadTickets()
+      if (selected?.id === id) setSelected(null)
+    } catch (err) { alert('Error') }
+  }
+
+  const priorityColors = {
+    LOW: 'bg-gray-100 text-gray-600', MEDIUM: 'bg-blue-100 text-blue-700',
+    HIGH: 'bg-orange-100 text-orange-700', CRITICAL: 'bg-red-100 text-red-700'
+  }
+  const statusColors = {
+    OPEN: 'bg-yellow-100 text-yellow-700', IN_PROGRESS: 'bg-blue-100 text-blue-700',
+    RESOLVED: 'bg-green-100 text-green-700', CLOSED: 'bg-gray-100 text-gray-500'
+  }
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <h3 className="font-semibold text-gray-700 mb-3">📩 Contactar al Equipo</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          ¿Tienes problemas o sugerencias? Escríbenos a:
-        </p>
-        <a href="mailto:soporte@agropulse.com" 
-           className="block bg-green-600 text-white text-center py-3 rounded-xl font-medium hover:bg-green-700">
-          📧 soporte@agropulse.com
-        </a>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <h3 className="font-semibold text-gray-700 mb-3">📋 Información del Sistema</h3>
-        <div className="space-y-2 text-sm text-gray-600">
-          <p>🌿 <strong>AgroPulse</strong></p>
-          <p>📅 Versión 6.0</p>
-          <p>🎓 Universidad Cooperativa de Colombia</p>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">🎧 Soporte Técnico</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{isAdmin ? 'Gestiona los tickets de soporte' : 'Crea y consulta tus solicitudes de soporte'}</p>
         </div>
+        {!isAdmin && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all transform hover:scale-105 flex items-center gap-2">
+            <Ticket size={16} /> {showForm ? 'Cancelar' : 'Nuevo Ticket'}
+          </button>
+        )}
       </div>
+
+      {/* Formulario nuevo ticket (usuarios) */}
+      {showForm && !isAdmin && (
+        <form onSubmit={handleCreate} className="bg-white rounded-2xl shadow-md border-2 border-green-200 p-5 space-y-4">
+          <h3 className="font-bold text-gray-800">📝 Nuevo Ticket de Soporte</h3>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Asunto *</label>
+            <input type="text" value={form.subject} onChange={e => setForm({...form, subject: e.target.value})}
+              placeholder="Describe el problema brevemente" required
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción *</label>
+            <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})}
+              placeholder="Describe el problema en detalle: qué ocurrió, cuándo, qué esperabas..." required rows={4}
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none resize-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+            <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none">
+              <option value="LOW">🔽 Baja — no urgente</option>
+              <option value="MEDIUM">▶️ Media — necesito ayuda pronto</option>
+              <option value="HIGH">🔼 Alta — afecta mi trabajo</option>
+              <option value="CRITICAL">🚨 Crítica — sistema caído</option>
+            </select>
+          </div>
+          <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition-all">
+            📤 Enviar Ticket
+          </button>
+        </form>
+      )}
+
+      {/* Panel admin: ticket seleccionado para responder */}
+      {isAdmin && selected && (
+        <div className="bg-white rounded-2xl shadow-md border-2 border-blue-200 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-blue-800">💬 Responder Ticket #{selected.id}</h3>
+            <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-800">{selected.subject}</p>
+            <p className="text-xs text-gray-600">{selected.description}</p>
+            <div className="flex gap-2 flex-wrap text-xs">
+              <span className={`px-2 py-1 rounded-full font-medium ${priorityColors[selected.priority]}`}>{selected.priorityDisplay}</span>
+              <span className="text-gray-400">Por: <strong>{selected.userName || 'Usuario #' + selected.userId}</strong></span>
+            </div>
+          </div>
+          {selected.adminResponse && (
+            <div className="bg-green-50 rounded-xl p-3 text-sm text-green-800">
+              <p className="font-semibold mb-1">Respuesta anterior:</p>
+              <p>{selected.adminResponse}</p>
+            </div>
+          )}
+          <textarea value={adminReply} onChange={e => setAdminReply(e.target.value)}
+            placeholder="Escribe tu respuesta al usuario..." rows={4}
+            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none resize-none" />
+          <div className="flex gap-3">
+            <select value={replyStatus} onChange={e => setReplyStatus(e.target.value)}
+              className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+              <option value="IN_PROGRESS">🔵 En proceso</option>
+              <option value="RESOLVED">🟢 Resuelto</option>
+              <option value="CLOSED">⚫ Cerrar</option>
+            </select>
+            <button onClick={() => handleReply(selected.id)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold transition-colors flex items-center justify-center gap-2">
+              <Send size={16} /> Enviar Respuesta
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de tickets */}
+      {loading ? (
+        <div className="text-center py-12"><div className="text-4xl animate-bounce">🎫</div><p className="text-gray-500 mt-2">Cargando tickets...</p></div>
+      ) : tickets.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+          <Ticket size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 font-medium">No hay tickets de soporte</p>
+          {!isAdmin && <button onClick={() => setShowForm(true)} className="mt-3 text-green-600 text-sm font-medium hover:text-green-700">Crear el primero</button>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {tickets.map(t => (
+            <div key={t.id} className={`bg-white rounded-2xl shadow-sm border-2 p-4 transition-all hover:shadow-md ${
+              t.status === 'OPEN' ? 'border-yellow-200' : t.status === 'RESOLVED' ? 'border-green-200' :
+              t.status === 'IN_PROGRESS' ? 'border-blue-200' : 'border-gray-200'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="font-bold text-gray-800 text-sm">#{t.id} {t.subject}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[t.status]}`}>{t.statusDisplay}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${priorityColors[t.priority]}`}>{t.priorityDisplay}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-2 mb-2">{t.description}</p>
+                  {t.adminResponse && (
+                    <div className="bg-blue-50 rounded-lg p-2 text-xs text-blue-800 mb-2">
+                      <span className="font-semibold">Respuesta Admin: </span>{t.adminResponse}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    {isAdmin && <span>👤 {t.userName || 'Usuario #' + t.userId}</span>}
+                    <span>📅 {t.createdAt ? new Date(t.createdAt).toLocaleDateString('es-CO') : '-'}</span>
+                  </div>
+                </div>
+                {isAdmin && t.status !== 'CLOSED' && (
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button onClick={() => { setSelected(t); setAdminReply(t.adminResponse || ''); setReplyStatus(t.status === 'OPEN' ? 'IN_PROGRESS' : t.status) }}
+                      className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                      💬 Responder
+                    </button>
+                    <button onClick={() => handleClose(t.id)}
+                      className="border-2 border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                      ✕ Cerrar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2676,7 +2930,6 @@ export default function App() {
         }
 
         const userEmail = authUser.email?.toLowerCase() || ''
-        // ADMIN: email específico o que contenga "admin"
         const isAdmin = userEmail === 'diarpicu2022@gmail.com' || userEmail.includes('admin')
         setUser({
           id: authUser.id,
@@ -2684,7 +2937,9 @@ export default function App() {
           full_name: authUser.user_metadata?.full_name || authUser.email,
           email: authUser.email,
           role: isAdmin ? 'ADMIN' : 'OPERATOR',
-          active: 1
+          active: 1,
+          avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+          provider: 'GOOGLE'
         })
       } catch (err) {
         console.error('Error buscando usuario:', err)
@@ -2695,27 +2950,29 @@ export default function App() {
           full_name: authUser.user_metadata?.full_name || authUser.email,
           email: authUser.email,
           role: 'OPERATOR',
-          active: 1
+          active: 1,
+          avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
+          provider: 'GOOGLE'
         })
       }
     }
 
-    // Verificar sesión existente
+    // Verificar sesión existente — await findOrCreateUser para evitar flash de login
     if (!supabase) {
       setAuthLoading(false)
       return
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        findOrCreateUser(session.user)
+        await findOrCreateUser(session.user)
       }
       setAuthLoading(false)
     })
 
     // Escuchar cambios de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        findOrCreateUser(session.user)
+        await findOrCreateUser(session.user)
       }
       setAuthLoading(false)
     })
@@ -2723,10 +2980,19 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const handleLogin = (userData) => setUser(userData)
+  const handleLogin = (userData) => {
+    setUser(userData)
+    setUserContext({
+      id:         userData.id,
+      role:       userData.role,
+      adminEmail: (userData.role === 'admin' || userData.role === 'ADMIN') ? userData.email : undefined
+    })
+  }
   const handleLogout = async () => {
     setUser(null)
     setPage('dashboard')
+    setUserContext({})
+    if (supabase) await supabase.auth.signOut()
   }
 
   if (authLoading) {
@@ -2800,21 +3066,32 @@ export default function App() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:block lg:translate-x-0`}>
           {/* Sidebar Header */}
-          <div className="bg-gradient-to-r from-green-800 to-emerald-700 px-5 py-5 flex items-center justify-between border-b border-green-600">
-            <div className="flex-1">
+          <div className="bg-gradient-to-b from-green-900 to-green-800 px-4 py-5 border-b border-green-600/50">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold">🌿</span>
+                <span className="text-xl">🌿</span>
                 <div>
-                  <span className="text-lg font-bold">AgroPulse</span>
-                  <span className="text-xs opacity-60 bg-green-500 px-2 py-0.5 rounded ml-1">v6.0</span>
+                  <span className="text-base font-bold tracking-wide">AgroPulse</span>
+                  <span className="text-[10px] opacity-50 bg-white/10 px-1.5 py-0.5 rounded ml-1.5">v9</span>
                 </div>
               </div>
-              <p className="text-xs opacity-70 mt-2 text-gray-200">{user.full_name || user.username}</p>
+              <button onClick={() => setSidebarOpen(false)} className="p-1 hover:bg-green-700 rounded-lg transition-colors lg:hidden">
+                <X size={18} />
+              </button>
             </div>
-            <button onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-green-700 rounded-lg transition-colors lg:hidden">
-              <X size={20} />
-            </button>
+            {/* User profile mini-card */}
+            <div className="flex items-center gap-3 bg-white/10 rounded-xl px-3 py-2.5">
+              {user.avatar
+                ? <img src={user.avatar} alt="avatar" className="w-9 h-9 rounded-full object-cover ring-2 ring-white/30" />
+                : <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center text-sm font-bold">
+                    {(user.full_name || user.username || '?')[0].toUpperCase()}
+                  </div>
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate">{user.full_name || user.username}</p>
+                <p className="text-[10px] opacity-60 capitalize">{isAdmin ? '⚙️ Admin' : '👤 Usuario'}</p>
+              </div>
+            </div>
           </div>
 
           {/* Sidebar Nav Items */}
@@ -2850,28 +3127,34 @@ export default function App() {
         </div>
 
         {/* Header */}
-        <header className="bg-gradient-to-r from-green-700 via-green-600 to-emerald-600 text-white px-4 py-4 flex items-center justify-between sticky top-0 z-20 shadow-lg lg:ml-64">
+        <header className="bg-white border-b border-gray-200 text-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm lg:ml-64">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)}
-              className="p-2 hover:bg-green-600 rounded-lg transition-colors lg:hidden">
-              <Menu size={20} />
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors lg:hidden">
+              <Menu size={20} className="text-gray-600" />
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">🌿</span>
-              <div>
-                <h1 className="text-lg font-bold">AgroPulse</h1>
-                <p className="text-xs opacity-70">Sistema de Monitoreo Inteligente</p>
-              </div>
+            <div>
+              <h1 className="text-base font-bold text-gray-800">
+                {navItems.find(n => n.id === page)?.label || 'AgroPulse'}
+              </h1>
+              <p className="text-xs text-gray-400 hidden sm:block">
+                {new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-xs opacity-70">Bienvenido</p>
-              <p className="text-sm font-semibold">{user.full_name || user.username}</p>
+              <p className="text-xs text-gray-500">{isAdmin ? 'Administrador' : 'Usuario'}</p>
+              <p className="text-sm font-semibold text-gray-800">{user.full_name || user.username}</p>
             </div>
-            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-              <span className="text-sm font-bold">👤</span>
-            </div>
+            {user.avatar
+              ? <img src={user.avatar} alt="avatar" className="w-9 h-9 rounded-full object-cover ring-2 ring-green-400 shadow-sm" />
+              : <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="text-white text-sm font-bold">
+                    {(user.full_name || user.username || '?')[0].toUpperCase()}
+                  </span>
+                </div>
+            }
           </div>
         </header>
 
@@ -2895,7 +3178,6 @@ export default function App() {
           {page === 'settings'   && <SettingsPage />}
         </main>
       </div>
-      <DebugInfo />
     </AuthContext.Provider>
   )
 }
@@ -3301,12 +3583,22 @@ function AnalyticsPage() {
 
 // ── Greenhouse Page ─────────────────────────────────────────
 function GreenhousePage() {
-  const [greenhouses, setGreenhouses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', location: '', description: '' })
+  const { user } = useAuth()
+  const isAdmin  = user?.role === 'admin' || user?.role === 'ADMIN'
 
-  useEffect(() => { loadGreenhouses() }, [])
+  const [greenhouses, setGreenhouses]       = useState([])
+  const [loading, setLoading]               = useState(true)
+  const [showForm, setShowForm]             = useState(false)
+  const [form, setForm]                     = useState({ name: '', location: '', description: '' })
+  const [expandedId, setExpandedId]         = useState(null) // invernadero expandido para ver usuarios
+  const [ghUsers, setGhUsers]               = useState({})  // { [ghId]: User[] }
+  const [allUsers, setAllUsers]             = useState([])
+  const [assignUserId, setAssignUserId]     = useState('')
+
+  useEffect(() => {
+    loadGreenhouses()
+    if (isAdmin) api.users.list().then(d => setAllUsers(d.users || [])).catch(() => {})
+  }, [])
 
   const loadGreenhouses = async () => {
     try {
@@ -3314,6 +3606,19 @@ function GreenhousePage() {
       setGreenhouses(data.greenhouses || [])
     } catch (err) { console.error(err) }
     setLoading(false)
+  }
+
+  const loadGhUsers = async (id) => {
+    try {
+      const data = await api.greenhouses.listUsers(id)
+      setGhUsers(prev => ({ ...prev, [id]: data.users || [] }))
+    } catch (err) { console.error(err) }
+  }
+
+  const toggleExpand = (id) => {
+    if (expandedId === id) { setExpandedId(null); return }
+    setExpandedId(id)
+    loadGhUsers(id)
   }
 
   const handleSubmit = async (e) => {
@@ -3327,49 +3632,143 @@ function GreenhousePage() {
   }
 
   const handleDelete = async (id) => {
-    if (confirm('¿Eliminar?')) {
-      try {
-        await api.greenhouses.delete(id)
-        loadGreenhouses()
-      } catch (err) { alert('Error: ' + err.message) }
+    if (confirm('¿Eliminar invernadero?')) {
+      try { await api.greenhouses.delete(id); loadGreenhouses() }
+      catch (err) { alert('Error: ' + err.message) }
     }
   }
 
+  const handleAssign = async (ghId) => {
+    if (!assignUserId) return
+    try {
+      await api.greenhouses.assignUser(ghId, parseInt(assignUserId))
+      setAssignUserId('')
+      loadGhUsers(ghId)
+    } catch (err) { alert('Error asignando usuario') }
+  }
+
+  const handleRemoveUser = async (ghId, userId) => {
+    try {
+      await api.greenhouses.removeUser(ghId, userId)
+      loadGhUsers(ghId)
+    } catch (err) { alert('Error removiendo usuario') }
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-800">🏡 Invernaderos</h2>
-        <button onClick={() => setShowForm(!showForm)} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700">
-          {showForm ? 'Cancelar' : '+ Nuevo'}
-        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">🏡 Invernaderos</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{isAdmin ? 'Gestiona invernaderos y asigna usuarios' : 'Tus invernaderos asignados'}</p>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+            {showForm ? 'Cancelar' : '+ Nuevo Invernadero'}
+          </button>
+        )}
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-          <input type="text" placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" required />
-          <input type="text" placeholder="Ubicación" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" />
-          <textarea placeholder="Descripción" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full border rounded-xl px-4 py-2 text-sm" />
-          <button type="submit" className="w-full bg-primary text-white py-2 rounded-xl font-medium">Guardar</button>
+      {showForm && isAdmin && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-md border-2 border-green-200 p-5 space-y-3">
+          <input type="text" placeholder="Nombre del invernadero *" value={form.name}
+            onChange={e => setForm({...form, name: e.target.value})}
+            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" required />
+          <input type="text" placeholder="Ubicación / Región" value={form.location}
+            onChange={e => setForm({...form, location: e.target.value})}
+            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" />
+          <textarea placeholder="Descripción" value={form.description}
+            onChange={e => setForm({...form, description: e.target.value})}
+            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" rows={2} />
+          <button type="submit" className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-2.5 rounded-xl font-bold">Guardar Invernadero</button>
         </form>
       )}
 
-      {loading ? <div className="text-center py-8">Cargando...</div> : greenhouses.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-          <p className="text-gray-500">No hay invernaderos</p>
-          <p className="text-sm text-gray-400 mt-1">Crea uno nuevo</p>
+      {loading ? (
+        <div className="text-center py-12"><div className="text-4xl animate-bounce">🏡</div><p className="text-gray-500 mt-2">Cargando...</p></div>
+      ) : greenhouses.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+          <Building2 size={48} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-500 font-medium">No hay invernaderos</p>
+          {isAdmin && <button onClick={() => setShowForm(true)} className="mt-3 text-green-600 text-sm font-medium">Crear el primero</button>}
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="space-y-3">
           {greenhouses.map(g => (
-            <div key={g.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-800">{g.name}</h3>
-                  <p className="text-sm text-gray-500">{g.location}</p>
-                  <p className="text-xs text-gray-400 mt-1">{g.description}</p>
+            <div key={g.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🌿</span>
+                    <h3 className="font-bold text-gray-800">{g.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${g.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {g.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  {g.location && <p className="text-sm text-gray-500 mt-0.5">📍 {g.location}</p>}
+                  {g.description && <p className="text-xs text-gray-400 mt-1">{g.description}</p>}
                 </div>
-                <button onClick={() => handleDelete(g.id)} className="text-red-500 text-sm">Eliminar</button>
+                <div className="flex gap-2 shrink-0 ml-3">
+                  {isAdmin && (
+                    <button onClick={() => toggleExpand(g.id)}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                      <UserPlus size={13} /> Usuarios
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button onClick={() => handleDelete(g.id)} className="text-red-400 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      Eliminar
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Panel de usuarios del invernadero (solo admin) */}
+              {isAdmin && expandedId === g.id && (
+                <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">👥 Usuarios asignados</p>
+
+                  {/* Asignar usuario */}
+                  <div className="flex gap-2">
+                    <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
+                      className="flex-1 border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                      <option value="">Seleccionar usuario...</option>
+                      {allUsers.filter(u => !(ghUsers[g.id] || []).find(gu => gu.id === u.id)).map(u => (
+                        <option key={u.id} value={u.id}>{u.fullName || u.username} ({u.role})</option>
+                      ))}
+                    </select>
+                    <button onClick={() => handleAssign(g.id)}
+                      className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1">
+                      <UserPlus size={14} /> Asignar
+                    </button>
+                  </div>
+
+                  {/* Lista de usuarios */}
+                  {(ghUsers[g.id] || []).length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Sin usuarios asignados aún</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(ghUsers[g.id] || []).map(u => (
+                        <div key={u.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center text-xs font-bold text-green-700">
+                              {(u.fullName || u.username || '?')[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-800">{u.fullName || u.username}</p>
+                              <p className="text-[10px] text-gray-400">{u.role}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => handleRemoveUser(g.id, u.id)}
+                            className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                            Quitar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -3521,6 +3920,56 @@ function LogsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Panel de diagnóstico del sistema */}
+      <DebugPanel />
+    </div>
+  )
+}
+
+function DebugPanel() {
+  const [open, setOpen]   = useState(false)
+  const [apiOk, setApiOk] = useState(null)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+  useEffect(() => {
+    fetch(apiUrl + '/api/auth/me').then(r => setApiOk(r.status < 500)).catch(() => setApiOk(false))
+  }, [])
+
+  return (
+    <div className="bg-gray-900 text-white rounded-2xl overflow-hidden">
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-800 transition-colors">
+        <span className="text-sm font-mono font-bold text-green-400">🔧 Diagnóstico del Sistema</span>
+        <span className="text-xs text-gray-400">{open ? '▲ Ocultar' : '▼ Ver'}</span>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 space-y-2 font-mono text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gray-800 rounded-lg p-3">
+              <p className="text-yellow-400 mb-1">🌐 Backend API</p>
+              <p>{apiUrl}</p>
+              <p className={apiOk === null ? 'text-gray-400' : apiOk ? 'text-green-400' : 'text-red-400'}>
+                {apiOk === null ? 'Verificando...' : apiOk ? '✅ Respondiendo' : '❌ No disponible'}
+              </p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3">
+              <p className="text-yellow-400 mb-1">🔷 Supabase</p>
+              <p className={import.meta.env.VITE_SUPABASE_URL ? 'text-green-400' : 'text-red-400'}>
+                {import.meta.env.VITE_SUPABASE_URL ? '✅ Configurado' : '❌ Sin configurar'}
+              </p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3">
+              <p className="text-yellow-400 mb-1">🤖 IA Groq</p>
+              <p className={getGroqKey() ? 'text-green-400' : 'text-gray-400'}>{getGroqKey() ? '✅ Key presente' : '— No configurado'}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3">
+              <p className="text-yellow-400 mb-1">🔧 Entorno</p>
+              <p>{import.meta.env.MODE}</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -77,7 +77,8 @@ public class RestServer {
             controllers.put("/api/alerts", new AlertRestController());
             controllers.put("/api/logs", new LogRestController());
             controllers.put("/api/seed", new SeedRestController());
-            controllers.put("/api/rules", new RulesRestController());
+            controllers.put("/api/rules",   new RulesRestController());
+            controllers.put("/api/tickets", new TicketRestController());
             // TODO: ReportRestController tiene problemas de compilación - pendiente
             // controllers.put("/api/reports", new ReportRestController());
         }
