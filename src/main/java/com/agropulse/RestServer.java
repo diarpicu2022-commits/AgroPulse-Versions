@@ -86,6 +86,17 @@ public class RestServer {
         protected void service(HttpServletRequest req, HttpServletResponse resp) 
                 throws java.io.IOException, javax.servlet.ServletException {
             
+            // CORS headers
+            resp.setHeader("Access-Control-Allow-Origin", "*");
+            resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            resp.setHeader("Access-Control-Max-Age", "3600");
+            
+            if ("OPTIONS".equalsIgnoreCase(req.getMethod())) {
+                resp.setStatus(HttpServletResponse.SC_OK);
+                return;
+            }
+            
             String path = req.getRequestURI();
             String method = req.getMethod();
             
