@@ -18,6 +18,8 @@ public class User {
     private LocalDateTime createdAt;
     private int    assignedGreenhouseId   = 0;  // 0 = todos (admin)
     private String assignedGreenhouseName = "";
+    private String email = "";       // Email (para login Google)
+    private String avatar = "";       // URL Avatar (para login Google)
 
     // --- Constructores ---
 
@@ -66,6 +68,12 @@ public class User {
     public void   setAssignedGreenhouseId(int v)     { this.assignedGreenhouseId = v; }
     public String getAssignedGreenhouseName()         { return assignedGreenhouseName; }
     public void   setAssignedGreenhouseName(String v) { this.assignedGreenhouseName = v; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String v) { this.email = v; }
+
+    public String getAvatar() { return avatar; }
+    public void setAvatar(String v) { this.avatar = v; }
 
     public boolean isAdmin() {
         return this.role == UserRole.ADMIN;

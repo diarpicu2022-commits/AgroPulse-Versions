@@ -208,6 +208,8 @@ public class AuthRestController extends JsonRestController {
             userObj.addProperty("id", u.getId());
             userObj.addProperty("username", u.getUsername());
             userObj.addProperty("full_name", u.getFullName());
+            userObj.addProperty("email", u.getEmail());
+            userObj.addProperty("avatar", u.getAvatar());
             userObj.addProperty("role", u.getRole().name());
             usersArray.add(userObj);
         }

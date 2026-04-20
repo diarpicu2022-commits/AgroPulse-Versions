@@ -395,6 +395,16 @@ public class DatabaseConnection {
                 // La columna ya existe — ignorar error de ALTER TABLE duplicado
             }
 
+            // ── Migración: agregar email y avatar a users si no existen ──
+            try {
+                stmt.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''");
+                System.out.println("  [DB] Migración: columna email añadida a users.");
+            } catch (SQLException ignored) {}
+            try {
+                stmt.execute("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''");
+                System.out.println("  [DB] Migración: columna avatar añadida a users.");
+            } catch (SQLException ignored) {}
+
             System.out.println("  [DB] Tablas inicializadas en " +
                 (isPg ? "PostgreSQL/Supabase" : "SQLite") + ".");
 

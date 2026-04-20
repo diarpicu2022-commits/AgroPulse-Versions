@@ -4150,9 +4150,18 @@ function AdminPanel({ user }) {
             return (
               <div key={u.id} className="bg-white rounded-lg shadow border border-gray-200 p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-800">{u.username}</h3>
-                    <p className="text-sm text-gray-500">{u.full_name || 'Sin nombre'}</p>
+                  <div className="flex items-center gap-3 flex-1">
+                    {u.avatar ? (
+                      <img src={u.avatar} alt="avatar" className="w-10 h-10 rounded-full object-cover ring-2 ring-green-200" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold">
+                        {(u.username || u.full_name || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-gray-800">{u.username}</h3>
+                      <p className="text-sm text-gray-500">{u.email}</p>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3">
