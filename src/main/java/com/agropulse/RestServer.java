@@ -89,7 +89,7 @@ public class RestServer {
             // CORS headers
             resp.setHeader("Access-Control-Allow-Origin", "*");
             resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Email, X-Requested-With");
             resp.setHeader("Access-Control-Max-Age", "3600");
             
             if ("OPTIONS".equalsIgnoreCase(req.getMethod())) {
