@@ -62,4 +62,4 @@ Los archivos se generan en `dist/`.
 
 ## Autor
 
-Leider Cadena — Universidad Cooperativa de Colombia, Nariño — Proyecto de Grado 2025
+Diego Armando Pinta Cuasquen — Universidad Cooperativa de Colombia, Nariño — Proyecto de Semestre 2025

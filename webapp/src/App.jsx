@@ -2603,7 +2603,7 @@ function SettingsPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">Desarrollador</span>
-            <span className="font-medium text-gray-800">Leider Cadena</span>
+            <span className="font-medium text-gray-800">Diego Armando Pinta Cuasquen</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Universidad</span>
@@ -2611,7 +2611,7 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Proyecto</span>
-            <span className="font-medium text-gray-800">Grado 2025</span>
+            <span className="font-medium text-gray-800">Semestre 2025</span>
           </div>
         </div>
       </div>
