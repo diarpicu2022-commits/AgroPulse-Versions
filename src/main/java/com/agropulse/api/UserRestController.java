@@ -85,6 +85,8 @@ public class UserRestController extends JsonRestController {
         json.addProperty("id", u.getId());
         json.addProperty("username", u.getUsername());
         json.addProperty("fullName", u.getFullName());
+        json.addProperty("email", u.getEmail());
+        json.addProperty("avatar", u.getAvatar());
         json.addProperty("phone", u.getPhone());
         json.addProperty("role", u.getRole().name());
         json.addProperty("active", u.isActive());

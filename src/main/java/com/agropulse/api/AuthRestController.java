@@ -41,9 +41,55 @@ public class AuthRestController extends JsonRestController {
             login(req, resp);
         } else if (path.equals("/api/auth/register")) {
             register(req, resp);
+        } else if (path.equals("/api/auth/sync-google-user")) {
+            syncGoogleUser(req, resp);
         } else {
             sendError(resp, 404, "Endpoint not found");
         }
+    }
+
+    private void syncGoogleUser(HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {
+        JsonObject body = gson.fromJson(req.getReader(), JsonObject.class);
+        
+        String username = body.has("username") ? body.get("username").getAsString().trim() : "";
+        String email = body.has("email") ? body.get("email").getAsString().trim() : "";
+        String fullName = body.has("full_name") ? body.get("full_name").getAsString().trim() : "";
+        String avatar = body.has("avatar") ? body.get("avatar").getAsString().trim() : "";
+        String role = body.has("role") ? body.get("role").getAsString().trim() : "OPERATOR";
+        
+        if (username.isEmpty() && email.isEmpty()) {
+            sendError(resp, 400, "Username o email requerido");
+            return;
+        }
+        
+        // Buscar usuario existente
+        User existingUser = null;
+        for (User u : userDao.findAll()) {
+            if (u.getUsername().equalsIgnoreCase(username) || (email != null && email.equals(u.getEmail()))) {
+                existingUser = u;
+                break;
+            }
+        }
+        
+        if (existingUser != null) {
+            // Actualizar datos
+            existingUser.setFullName(fullName);
+            existingUser.setEmail(email);
+            existingUser.setAvatar(avatar);
+            userDao.update(existingUser);
+        } else {
+            // Crear nuevo usuario Google (sin password)
+            User newUser = new User();
+            newUser.setUsername(username.isEmpty() ? email.split("@")[0] : username);
+            newUser.setFullName(fullName);
+            newUser.setEmail(email);
+            newUser.setAvatar(avatar);
+            newUser.setRole(com.agropulse.model.enums.UserRole.valueOf(role));
+            newUser.setActive(true);
+            userDao.save(newUser);
+        }
+        
+        sendJson(resp, new JsonObject());
     }
 
     private void handleGet(String path, HttpServletRequest req, HttpServletResponse resp) throws SQLException, IOException {

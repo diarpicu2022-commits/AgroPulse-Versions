@@ -2960,6 +2960,23 @@ export default function App() {
           console.error('Error creando usuario Google:', createError)
         }
 
+        // Sincronizar con REST API
+        try {
+          await fetch(`${API_URL}/api/auth/sync-google-user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: username,
+              email: authUser.email,
+              full_name: fullName,
+              avatar: avatarUrl,
+              role: isAdmin ? 'ADMIN' : 'OPERATOR'
+            })
+          })
+        } catch (syncErr) {
+          console.error('Error sincronizando con REST:', syncErr)
+        }
+
         const userToSet = newUser || {
           id: authUser.id,
           username: username,
@@ -4079,10 +4096,17 @@ function UsersPage() {
         <div className="grid gap-3">
           {users.map(u => (
             <div key={u.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <div className="flex items-start justify-between">
-                <div>
+              <div className="flex items-center gap-3">
+                {u.avatar ? (
+                  <img src={u.avatar} alt="avatar" className="w-12 h-12 rounded-full object-cover ring-2 ring-green-200" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-lg">
+                    {(u.username || u.fullName || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1">
                   <h3 className="font-semibold text-gray-800">{u.username}</h3>
-                  <p className="text-sm text-gray-500">{u.fullName}</p>
+                  <p className="text-sm text-gray-500">{u.email || u.fullName || 'Sin nombre'}</p>
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">{u.role}</span>
                 </div>
                 <button onClick={() => handleDelete(u.id)} className="text-red-500 text-sm">Eliminar</button>

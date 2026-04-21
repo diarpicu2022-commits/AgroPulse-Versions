@@ -256,9 +256,11 @@ public class DatabaseConnection {
             stmt.execute("CREATE TABLE IF NOT EXISTS users (" +
                 "id          " + autoInc + "," +
                 "username    TEXT    UNIQUE NOT NULL," +
-                "password    TEXT    NOT NULL," +       // PBKDF2-SHA512 hash
-                "full_name   TEXT    NOT NULL," +       // AES-256-GCM cifrado
+                "password    TEXT," +                    // Puede ser null para usuarios Google
+                "full_name   TEXT," +                   // AES-256-GCM cifrado
                 "phone       TEXT," +                  // AES-256-GCM cifrado
+                "email       TEXT," +
+                "avatar      TEXT," +
                 "role        TEXT    NOT NULL DEFAULT 'USER'," +
                 "active      INTEGER NOT NULL DEFAULT 1," +
                 "created_at  TEXT    NOT NULL" +
