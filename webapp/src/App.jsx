@@ -2731,6 +2731,8 @@ function SettingsPage() {
   const githubActive = getGitHubToken()
   const gemmaActive = getGemmaKey()
   const activeCount = [groqActive, githubActive, gemmaActive].filter(Boolean).length
+  
+  const isAdmin = authUser?.role === 'ADMIN' || authUser?.role === 'admin'
 
   return (
     <div className="space-y-4">
@@ -2783,7 +2785,12 @@ function SettingsPage() {
         </div>
       </div>
 
-      {/* Configurar 3 IAs */}
+      {/* Configurar 3 IAs - Solo ADMIN */}
+      {!isAdmin ? (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+          <p className="text-red-700 font-medium">🔒 Solo Administradores pueden configurar IAs</p>
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           <Key size={14} className="inline mr-1" /> Inteligencias Artificiales
@@ -2850,6 +2857,7 @@ function SettingsPage() {
           {saved ? '✅ Todas guardadas' : '💾 Guardar todas las claves'}
         </button>
       </div>
+      )}
 
       {/* Equipo de desarrollo */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -2901,6 +2909,12 @@ export default function App() {
     }
 
     const findOrCreateUser = async (authUser) => {
+      const userEmail = authUser.email?.toLowerCase() || ''
+      const isAdmin = userEmail === 'diarpicu2022@gmail.com' || userEmail.includes('admin')
+      const username = authUser.email.split('@')[0]
+      const avatarUrl = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null
+      const fullName = authUser.user_metadata?.full_name || authUser.email
+
       try {
         // Buscar usuario existente por email
         const { data: existing } = await supabase
@@ -2915,8 +2929,7 @@ export default function App() {
           return
         }
 
-        // Buscar por username (parte antes del @)
-        const username = authUser.email.split('@')[0]
+        // Buscar por username
         const { data: byUsername } = await supabase
           .from('users')
           .select('*')
@@ -2929,30 +2942,44 @@ export default function App() {
           return
         }
 
-        const userEmail = authUser.email?.toLowerCase() || ''
-        const isAdmin = userEmail === 'diarpicu2022@gmail.com' || userEmail.includes('admin')
+        // Crear usuario en Supabase
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert({
+            username: username,
+            full_name: fullName,
+            email: authUser.email,
+            avatar: avatarUrl,
+            role: isAdmin ? 'ADMIN' : 'OPERATOR',
+            active: 1
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Error creando usuario Google:', createError)
+        }
+
+        const userToSet = newUser || {
+          id: authUser.id,
+          username: username,
+          full_name: fullName,
+          email: authUser.email,
+          avatar: avatarUrl,
+          role: isAdmin ? 'ADMIN' : 'OPERATOR',
+          active: 1
+        }
+        setUser(userToSet)
+      } catch (err) {
+        console.error('Error buscando usuario:', err)
         setUser({
           id: authUser.id,
           username: username,
-          full_name: authUser.user_metadata?.full_name || authUser.email,
+          full_name: fullName,
           email: authUser.email,
+          avatar: avatarUrl,
           role: isAdmin ? 'ADMIN' : 'OPERATOR',
-          active: 1,
-          avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
-          provider: 'GOOGLE'
-        })
-      } catch (err) {
-        console.error('Error buscando usuario:', err)
-        // Fallback: usar datos de Google directamente
-        setUser({
-          id: authUser.id,
-          username: authUser.email.split('@')[0],
-          full_name: authUser.user_metadata?.full_name || authUser.email,
-          email: authUser.email,
-          role: 'OPERATOR',
-          active: 1,
-          avatar: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture || null,
-          provider: 'GOOGLE'
+          active: 1
         })
       }
     }
